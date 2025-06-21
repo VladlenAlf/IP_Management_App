@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход в систему - IP Management</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .login-header h1 {
+            color: #2c3e50;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .login-header p {
+            color: #7f8c8d;
+            font-size: 16px;
+        }
+        
+        .login-form .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .login-form input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #eee;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+        
+        .login-form input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .login-btn {
+            width: 100%;
+            padding: 15px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .login-btn:hover {
+            background: #2980b9;
+            transform: translateY(-1px);
+        }
+        
+        .login-btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .login-footer {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        
+        .demo-credentials {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .demo-credentials h4 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        
+        .demo-credentials p {
+            margin: 5px 0;
+            font-family: 'Courier New', monospace;
+            color: #34495e;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <div class="login-header">
+                <h1>🌐 IP Management</h1>
+                <p>Система управления IP адресами</p>
+            </div>
+            
+            <form class="login-form" id="loginForm">
+                <div class="form-group">
+                    <input type="text" id="username" placeholder="Имя пользователя" required>
+                </div>
+                
+                <div class="form-group">
+                    <input type="password" id="password" placeholder="Пароль" required>
+                </div>
+                
+                <button type="submit" class="login-btn" id="loginBtn">
+                    Войти в систему
+                </button>
+            </form>
+            
+            <div class="demo-credentials">
+                <h4>Демо-доступ:</h4>
+                <p>Логин: <strong>admin</strong></p>
+                <p>Пароль: <strong>admin123</strong></p>
+            </div>
+            
+            <div class="login-footer">
+                © 2024 IP Management System
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            
+            // Показываем загрузку
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Вход...';
+            
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Успешная авторизация - перенаправляем
+                    window.location.href = '/';
+                } else {
+                    // Показываем ошибку
+                    showError(data.error || 'Ошибка входа в систему');
+                    loginBtn.disabled = false;
+                    loginBtn.textContent = 'Войти в систему';
+                }
+            } catch (error) {
+                showError('Ошибка соединения с сервером');
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Войти в систему';
+            }
+        });
+        
+        function showError(message) {
+            // Удаляем предыдущие сообщения об ошибках
+            const existingError = document.querySelector('.error-message');
+            if (existingError) {
+                existingError.remove();
+            }
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'message error error-message';
+            errorDiv.textContent = message;
+            errorDiv.style.marginTop = '15px';
+            
+            document.querySelector('.login-form').appendChild(errorDiv);
+            
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
+        }
+        
+        // Проверяем, авторизован ли пользователь уже
+        fetch('/api/auth-status')
+            .then(response => response.json())
+            .then(data => {
+                if (data.authenticated) {
+                    window.location.href = '/';
+                }
+            })
+            .catch(error => {
+                console.log('Пользователь не авторизован');
+            });
+    </script>
+</body>
+</html>

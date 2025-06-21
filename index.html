@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP Management System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <div class="header-left">
+                    <h1>Система управления IP адресами</h1>
+                </div>
+                <div class="header-right">
+                    <span class="user-info" id="userInfo">Загрузка...</span>
+                    <button class="btn btn-secondary btn-small" onclick="logout()">Выйти</button>
+                </div>
+            </div>
+            <div class="stats" id="stats">
+                <div class="stat-item">
+                    <span class="stat-number" id="totalIps">0</span>
+                    <span class="stat-label">Всего IP</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number occupied" id="occupiedIps">0</span>
+                    <span class="stat-label">Занято</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number free" id="freeIps">0</span>
+                    <span class="stat-label">Свободно</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="totalSubnets">0</span>
+                    <span class="stat-label">Подсетей</span>
+                </div>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-button active" onclick="showTab('ip-management')">IP Адреса</button>
+            <button class="tab-button" onclick="showTab('subnet-management')">Подсети</button>
+            <button class="tab-button" onclick="showTab('import-export')">Импорт/Экспорт</button>
+        </nav>
+
+        <!-- IP Management Tab -->
+        <div id="ip-management" class="tab-content active">
+            <div class="toolbar">
+                <button class="btn btn-primary" onclick="showAddIpModal()">Добавить IP</button>
+                
+                <div class="filters">
+                    <select id="subnetFilter" onchange="filterIPs()">
+                        <option value="">Все подсети</option>
+                    </select>
+                    
+                    <select id="statusFilter" onchange="filterIPs()">
+                        <option value="">Все статусы</option>
+                        <option value="1">Занято</option>
+                        <option value="0">Свободно</option>
+                    </select>
+                    
+                    <input type="text" id="searchInput" placeholder="Поиск..." onkeyup="filterIPs()">
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table id="ipTable">
+                    <thead>
+                        <tr>
+                            <th>IP Адрес</th>
+                            <th>Подсеть</th>
+                            <th>Компания</th>
+                            <th>Дата выдачи</th>
+                            <th>Статус</th>
+                            <th>Описание</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Subnet Management Tab -->
+        <div id="subnet-management" class="tab-content">
+            <div class="toolbar">
+                <button class="btn btn-primary" onclick="showAddSubnetModal()">Добавить подсеть</button>
+            </div>
+
+            <div class="table-container">
+                <table id="subnetTable">
+                    <thead>
+                        <tr>
+                            <th>Сеть</th>
+                            <th>Маска</th>
+                            <th>Доступные адреса</th>
+                            <th>Описание</th>
+                            <th>Создано</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Import/Export Tab -->
+        <div id="import-export" class="tab-content">
+            <div class="import-section">
+                <h3>Импорт из Excel</h3>
+                <div class="file-upload">
+                    <input type="file" id="excelFile" accept=".xlsx,.xls" onchange="handleFileSelect()">
+                    <button class="btn btn-primary" onclick="importExcel()">Импортировать</button>
+                </div>
+                <div class="import-info">
+                    <p>Поддерживаемые колонки: ip_address, company_name, assigned_date, is_occupied, description</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for adding/editing IP -->
+    <div id="ipModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('ipModal')">&times;</span>
+            <h2 id="ipModalTitle">Добавить IP адрес</h2>
+            <form id="ipForm">
+                <input type="hidden" id="ipId">
+                
+                <div class="form-group">
+                    <label for="ipAddress">IP Адрес:</label>
+                    <input type="text" id="ipAddress" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="ipSubnet">Подсеть:</label>
+                    <select id="ipSubnet">
+                        <option value="">Без подсети</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="companyName">Компания:</label>
+                    <input type="text" id="companyName">
+                </div>
+                
+                <div class="form-group">
+                    <label for="assignedDate">Дата выдачи:</label>
+                    <input type="date" id="assignedDate">
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="isOccupied"> Занят
+                    </label>
+                </div>
+                
+                <div class="form-group">
+                    <label for="ipDescription">Описание:</label>
+                    <textarea id="ipDescription" rows="3"></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('ipModal')">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for adding subnet -->
+    <div id="subnetModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('subnetModal')">&times;</span>
+            <h2>Добавить подсеть</h2>
+            <form id="subnetForm">
+                <div class="form-group">
+                    <label for="subnetNetwork">Сеть:</label>
+                    <input type="text" id="subnetNetwork" placeholder="192.168.1.0" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="subnetMask">Маска:</label>
+                    <select id="subnetMask" required>
+                        <option value="24">/24 (255.255.255.0) - 254 адреса</option>
+                        <option value="25">/25 (255.255.255.128) - 126 адресов</option>
+                        <option value="26">/26 (255.255.255.192) - 62 адреса</option>
+                        <option value="27">/27 (255.255.255.224) - 30 адресов</option>
+                        <option value="28">/28 (255.255.255.240) - 14 адресов</option>
+                        <option value="29">/29 (255.255.255.248) - 6 адресов</option>
+                        <option value="30">/30 (255.255.255.252) - 2 адреса</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="subnetDescription">Описание:</label>
+                    <textarea id="subnetDescription" rows="3"></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Создать</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('subnetModal')">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
