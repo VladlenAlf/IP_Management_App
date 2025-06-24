@@ -6,8 +6,8 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background-color: #f5f5f5;
-    color: #333;
+    background-color: #f8f9fa;
+    color: #2c3e50;
     line-height: 1.6;
 }
 
@@ -17,29 +17,26 @@ body {
     padding: 20px;
 }
 
-/* Header */
+/* Заголовок */
 header {
     background: white;
+    border-radius: 10px;
     padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
 }
 
 .header-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
-    flex-wrap: wrap;
-    gap: 15px;
+    margin-bottom: 20px;
 }
 
 .header-left h1 {
     color: #2c3e50;
-    font-size: 24px;
+    font-size: 28px;
     font-weight: 600;
-    margin: 0;
 }
 
 .header-right {
@@ -50,30 +47,30 @@ header {
 
 .user-info {
     color: #7f8c8d;
-    font-size: 14px;
     font-weight: 500;
 }
 
+/* Статистика */
 .stats {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 20px;
-    flex-wrap: wrap;
 }
 
 .stat-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+    text-align: center;
     padding: 15px;
     background: #f8f9fa;
-    border-radius: 6px;
-    min-width: 100px;
+    border-radius: 8px;
+    border-left: 4px solid #3498db;
 }
 
 .stat-number {
-    font-size: 24px;
-    font-weight: bold;
+    display: block;
+    font-size: 32px;
+    font-weight: 700;
     color: #2c3e50;
+    margin-bottom: 5px;
 }
 
 .stat-number.occupied {
@@ -85,59 +82,57 @@ header {
 }
 
 .stat-label {
-    font-size: 12px;
     color: #7f8c8d;
-    margin-top: 5px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
-/* Tabs */
+/* Табы */
 .tabs {
     display: flex;
     background: white;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-radius: 10px;
     margin-bottom: 20px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
 }
 
 .tab-button {
     flex: 1;
     padding: 15px 20px;
+    background: transparent;
     border: none;
-    background: white;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 500;
     color: #7f8c8d;
     transition: all 0.3s ease;
-    border-bottom: 3px solid transparent;
 }
 
 .tab-button:hover {
     background: #f8f9fa;
-    color: #2c3e50;
 }
 
 .tab-button.active {
-    color: #3498db;
-    border-bottom-color: #3498db;
-    background: #f8f9fa;
+    background: #3498db;
+    color: white;
 }
 
-/* Tab Content */
+/* Контент табов */
 .tab-content {
     display: none;
     background: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-radius: 10px;
     padding: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
 }
 
 .tab-content.active {
     display: block;
 }
 
-/* Toolbar */
+/* Панель инструментов */
 .toolbar {
     display: flex;
     justify-content: space-between;
@@ -153,29 +148,17 @@ header {
     flex-wrap: wrap;
 }
 
-.filters select,
-.filters input {
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-}
-
-.filters input {
-    min-width: 200px;
-}
-
-/* Buttons */
+/* Кнопки */
 .btn {
     padding: 10px 20px;
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
     font-size: 14px;
     font-weight: 500;
-    transition: all 0.3s ease;
     text-decoration: none;
     display: inline-block;
+    transition: all 0.3s ease;
 }
 
 .btn-primary {
@@ -215,11 +198,11 @@ header {
 }
 
 .btn-small {
-    padding: 5px 10px;
+    padding: 6px 12px;
     font-size: 12px;
 }
 
-/* Tables */
+/* Таблицы */
 .table-container {
     overflow-x: auto;
 }
@@ -227,167 +210,293 @@ header {
 table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 10px;
+    background: white;
+}
+
+thead {
+    background: #f8f9fa;
 }
 
 th, td {
     padding: 12px;
     text-align: left;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid #e1e5e9;
 }
 
 th {
-    background: #f8f9fa;
     font-weight: 600;
     color: #2c3e50;
-    font-size: 14px;
-}
-
-td {
-    font-size: 14px;
+    position: sticky;
+    top: 0;
+    background: #f8f9fa;
 }
 
 tr:hover {
     background: #f8f9fa;
 }
 
+/* Статус бейджи */
 .status-badge {
-    padding: 4px 8px;
-    border-radius: 12px;
+    padding: 4px 12px;
+    border-radius: 20px;
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 600;
+    text-transform: uppercase;
 }
 
 .status-occupied {
-    background: #fee;
+    background: #ffe6e6;
     color: #e74c3c;
 }
 
 .status-free {
-    background: #efe;
+    background: #e8f5e8;
     color: #27ae60;
 }
 
-/* Modals */
-.modal {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0,0,0,0.5);
-}
-
-.modal-content {
-    background-color: white;
-    margin: 5% auto;
-    padding: 20px;
-    border-radius: 8px;
-    width: 90%;
-    max-width: 500px;
-    position: relative;
-    max-height: 80vh;
-    overflow-y: auto;
-}
-
-.close {
-    position: absolute;
-    right: 20px;
-    top: 20px;
-    font-size: 24px;
-    font-weight: bold;
-    cursor: pointer;
-    color: #999;
-}
-
-.close:hover {
-    color: #333;
-}
-
-.modal h2 {
-    margin-bottom: 20px;
-    color: #2c3e50;
-}
-
-/* Forms */
+/* Формы */
 .form-group {
-    margin-bottom: 15px;
+    margin-bottom: 20px;
 }
 
 .form-group label {
     display: block;
-    margin-bottom: 5px;
+    margin-bottom: 8px;
     font-weight: 500;
     color: #2c3e50;
 }
 
-.form-group input,
-.form-group select,
-.form-group textarea {
+input, select, textarea {
     width: 100%;
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    padding: 12px;
+    border: 2px solid #e1e5e9;
+    border-radius: 6px;
     font-size: 14px;
+    transition: border-color 0.3s ease;
 }
 
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
+input:focus, select:focus, textarea:focus {
     outline: none;
     border-color: #3498db;
 }
 
-.form-group input[type="checkbox"] {
-    width: auto;
-    margin-right: 8px;
+textarea {
+    resize: vertical;
+    min-height: 80px;
 }
 
 .form-actions {
     display: flex;
     gap: 10px;
     justify-content: flex-end;
-    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e1e5e9;
 }
 
-/* Import/Export */
+/* Модальные окна */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    overflow-y: auto;
+}
+
+.modal-content {
+    background: white;
+    margin: 50px auto;
+    padding: 20px;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 500px;
+    position: relative;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+}
+
+.close {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #aaa;
+}
+
+.close:hover {
+    color: #000;
+}
+
+/* Сообщения */
+.message {
+    padding: 15px 20px;
+    margin: 10px 0;
+    border-radius: 6px;
+    font-weight: 500;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    max-width: 400px;
+    z-index: 1001;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.message.success {
+    background: #d4edda;
+    color: #155724;
+    border-left: 4px solid #27ae60;
+}
+
+.message.error {
+    background: #f8d7da;
+    color: #721c24;
+    border-left: 4px solid #e74c3c;
+}
+
+/* Импорт/экспорт */
 .import-section {
-    margin-bottom: 30px;
-}
-
-.import-section h3 {
-    margin-bottom: 15px;
-    color: #2c3e50;
+    max-width: 600px;
 }
 
 .file-upload {
     display: flex;
     gap: 10px;
     align-items: center;
-    margin-bottom: 10px;
+    margin-bottom: 15px;
 }
 
-.file-upload input[type="file"] {
-    flex: 1;
-    padding: 8px;
+.import-info {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 6px;
+    border-left: 4px solid #3498db;
+}
+
+.import-info p {
+    color: #7f8c8d;
+    margin: 0;
+}
+
+/* Стили для логов аудита */
+.action-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.action-login_success { background: #d4edda; color: #155724; }
+.action-login_failed { background: #f8d7da; color: #721c24; }
+.action-logout { background: #e2e3e5; color: #383d41; }
+.action-create_subnet,
+.action-create_ip { background: #d1ecf1; color: #0c5460; }
+.action-update_subnet,
+.action-update_ip { background: #fff3cd; color: #856404; }
+.action-delete_subnet,
+.action-delete_ip { background: #f8d7da; color: #721c24; }
+.action-bulk_create_ip,
+.action-import_excel { background: #d1e7dd; color: #0f5132; }
+
+.pagination {
+    margin-top: 20px;
+    text-align: center;
+    padding: 20px 0;
+}
+
+.pagination button {
+    margin: 0 5px;
+}
+
+.pagination-info {
+    margin-left: 20px;
+    color: #6c757d;
+    font-size: 14px;
+}
+
+#logsTable td:nth-child(6) {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Стили для модального окна деталей лога */
+.log-detail-section {
+    margin-bottom: 25px;
+    padding: 15px;
+    border: 1px solid #e1e5e9;
+    border-radius: 6px;
+    background-color: #f8f9fa;
+}
+
+.log-detail-section h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #2c3e50;
+    font-size: 16px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 8px;
+}
+
+.log-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.log-detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.log-detail-item strong {
+    color: #34495e;
+    font-size: 14px;
+}
+
+.log-detail-item span {
+    color: #2c3e50;
+    font-size: 14px;
+    padding: 5px 8px;
+    background-color: white;
     border: 1px solid #ddd;
     border-radius: 4px;
 }
 
-.import-info {
-    color: #7f8c8d;
-    font-size: 12px;
-    background: #f8f9fa;
-    padding: 10px;
-    border-radius: 4px;
+.log-values {
+    background-color: #2d3748;
+    color: #e2e8f0;
+    padding: 15px;
+    border-radius: 6px;
+    font-family: 'Courier New', Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.4;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }
 
-/* Responsive */
+/* Адаптивность */
 @media (max-width: 768px) {
     .container {
         padding: 10px;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+    
+    .stats {
+        grid-template-columns: repeat(2, 1fr);
     }
     
     .toolbar {
@@ -399,47 +508,31 @@ tr:hover {
         justify-content: center;
     }
     
+    .modal-content {
+        margin: 20px auto;
+        width: 95%;
+    }
+    
+    .log-detail-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 480px) {
     .stats {
-        justify-content: center;
+        grid-template-columns: 1fr;
     }
     
     .tabs {
         flex-direction: column;
     }
     
-    .tab-button {
-        border-bottom: 1px solid #eee;
-        border-right: none;
+    .btn {
+        width: 100%;
+        text-align: center;
     }
-    
-    .tab-button.active {
-        border-bottom-color: #eee;
-        border-left: 3px solid #3498db;
-    }
-}
-
-/* Loading state */
-.loading {
-    text-align: center;
-    padding: 40px;
-    color: #7f8c8d;
-}
-
-/* Success/Error messages */
-.message {
-    padding: 10px 15px;
-    border-radius: 4px;
-    margin-bottom: 15px;
-}
-
-.message.success {
-    background: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
-}
-
-.message.error {
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
 }

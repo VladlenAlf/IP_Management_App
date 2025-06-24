@@ -42,12 +42,14 @@
             <button class="tab-button active" onclick="showTab('ip-management')">IP Адреса</button>
             <button class="tab-button" onclick="showTab('subnet-management')">Подсети</button>
             <button class="tab-button" onclick="showTab('import-export')">Импорт/Экспорт</button>
+            <button class="tab-button" onclick="showTab('audit-logs')">Логи системы</button>
         </nav>
 
         <!-- IP Management Tab -->
         <div id="ip-management" class="tab-content active">
             <div class="toolbar">
                 <button class="btn btn-primary" onclick="showAddIpModal()">Добавить IP</button>
+                <button class="btn btn-success" onclick="showBulkIpModal()">Массовое добавление IP</button>
                 
                 <div class="filters">
                     <select id="subnetFilter" onchange="filterIPs()">
@@ -118,6 +120,55 @@
                 </div>
             </div>
         </div>
+
+        <!-- Audit Logs Tab -->
+        <div id="audit-logs" class="tab-content">
+            <div class="toolbar">
+                <div class="filters">
+                    <select id="actionFilter" onchange="filterLogs()">
+                        <option value="">Все действия</option>
+                        <option value="LOGIN">Вход в систему</option>
+                        <option value="LOGOUT">Выход из системы</option>
+                        <option value="CREATE">Создание</option>
+                        <option value="UPDATE">Изменение</option>
+                        <option value="DELETE">Удаление</option>
+                        <option value="IMPORT">Импорт</option>
+                        <option value="BULK">Массовые операции</option>
+                    </select>
+                    
+                    <select id="entityFilter" onchange="filterLogs()">
+                        <option value="">Все объекты</option>
+                        <option value="user">Пользователи</option>
+                        <option value="subnet">Подсети</option>
+                        <option value="ip_address">IP адреса</option>
+                    </select>
+                    
+                    <input type="text" id="userFilter" placeholder="Пользователь..." onkeyup="filterLogs()">
+                    
+                    <button class="btn btn-secondary" onclick="refreshLogs()">Обновить</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table id="logsTable">
+                    <thead>
+                        <tr>
+                            <th>Дата/Время</th>
+                            <th>Пользователь</th>
+                            <th>Действие</th>
+                            <th>Объект</th>
+                            <th>ID</th>
+                            <th>Детали</th>
+                            <th>IP адрес</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            
+            <div class="pagination" id="logsPagination"></div>
+        </div>
+
     </div>
 
     <!-- Modal for adding/editing IP -->
@@ -173,8 +224,10 @@
     <div id="subnetModal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal('subnetModal')">&times;</span>
-            <h2>Добавить подсеть</h2>
+            <h2 id="subnetModalTitle">Добавить подсеть</h2>
             <form id="subnetForm">
+                <input type="hidden" id="subnetId">
+                
                 <div class="form-group">
                     <label for="subnetNetwork">Сеть:</label>
                     <input type="text" id="subnetNetwork" placeholder="192.168.1.0" required>
@@ -203,6 +256,115 @@
                     <button type="button" class="btn btn-secondary" onclick="closeModal('subnetModal')">Отмена</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal for bulk IP creation -->
+    <div id="bulkIpModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('bulkIpModal')">&times;</span>
+            <h2>Массовое добавление IP адресов</h2>
+            <form id="bulkIpForm">
+                <div class="form-group">
+                    <label for="bulkSubnet">Подсеть:</label>
+                    <select id="bulkSubnet" required>
+                        <option value="">Выберите подсеть</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="startIp">Начальный IP адрес:</label>
+                    <input type="text" id="startIp" placeholder="192.168.1.10" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="endIp">Конечный IP адрес:</label>
+                    <input type="text" id="endIp" placeholder="192.168.1.20" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="bulkCompanyName">Компания (для всех IP):</label>
+                    <input type="text" id="bulkCompanyName">
+                </div>
+                
+                <div class="form-group">
+                    <label for="bulkAssignedDate">Дата выдачи (для всех IP):</label>
+                    <input type="date" id="bulkAssignedDate">
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="bulkIsOccupied"> Все IP заняты
+                    </label>
+                </div>
+                
+                <div class="form-group">
+                    <label for="bulkDescription">Описание (для всех IP):</label>
+                    <textarea id="bulkDescription" rows="3"></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Создать IP адреса</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('bulkIpModal')">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for log details -->
+    <div id="logDetailsModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <span class="close" onclick="closeModal('logDetailsModal')">&times;</span>
+            <h2>Детали лога аудита</h2>
+            <div id="logDetailsContent">
+                <div class="log-detail-section">
+                    <h3>Основная информация</h3>
+                    <div class="log-detail-grid">
+                        <div class="log-detail-item">
+                            <strong>Дата и время:</strong>
+                            <span id="logDetailDate"></span>
+                        </div>
+                        <div class="log-detail-item">
+                            <strong>Пользователь:</strong>
+                            <span id="logDetailUser"></span>
+                        </div>
+                        <div class="log-detail-item">
+                            <strong>Действие:</strong>
+                            <span id="logDetailAction"></span>
+                        </div>
+                        <div class="log-detail-item">
+                            <strong>Тип объекта:</strong>
+                            <span id="logDetailEntity"></span>
+                        </div>
+                        <div class="log-detail-item">
+                            <strong>ID объекта:</strong>
+                            <span id="logDetailEntityId"></span>
+                        </div>
+                        <div class="log-detail-item">
+                            <strong>IP адрес:</strong>
+                            <span id="logDetailIp"></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="log-detail-section" id="oldValuesSection" style="display: none;">
+                    <h3>Старые значения</h3>
+                    <pre id="logDetailOldValues" class="log-values"></pre>
+                </div>
+                
+                <div class="log-detail-section" id="newValuesSection" style="display: none;">
+                    <h3>Новые значения</h3>
+                    <pre id="logDetailNewValues" class="log-values"></pre>
+                </div>
+                
+                <div class="log-detail-section">
+                    <h3>Техническая информация</h3>
+                    <div class="log-detail-item">
+                        <strong>User Agent:</strong>
+                        <span id="logDetailUserAgent" style="word-break: break-all;"></span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
