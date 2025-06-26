@@ -6,29 +6,28 @@ const cors = require('cors');
 const path = require('path');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
+const os = require('os');
+const networkConfig = require('./config/network');
 
 // Устанавливаем временную зону для Польши
 process.env.TZ = 'Europe/Warsaw';
 
 const app = express();
-const PORT = 3000;
+const { host: HOST, port: PORT } = networkConfig.server;
 
-// Middleware
-app.use(cors());
+// Настройка доверия прокси для работы в сети
+if (networkConfig.security.trustProxy) {
+  app.set('trust proxy', 1);
+}
+
+// Middleware с настройками для сети
+app.use(cors(networkConfig.cors));
 app.use(express.json());
 app.use(express.static('.'));
 app.use(express.urlencoded({ extended: true }));
 
-// Настройка сессий
-app.use(session({
-  secret: 'ip-management-secret-key-2024',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { 
-    secure: false, // true для HTTPS
-    maxAge: 24 * 60 * 60 * 1000 // 24 часа
-  }
-}));
+// Настройка сессий с конфигурацией для сети
+app.use(session(networkConfig.session));
 
 // Multer для загрузки файлов
 const upload = multer({ dest: 'uploads/' });
@@ -822,6 +821,62 @@ app.get('/api/analytics/utilization', requireAuth, (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Сервер запущен на http://localhost:${PORT}`);
+// Функция для получения сетевых адресов
+function getNetworkAddresses() {
+  const addresses = [];
+  const networkInterfaces = os.networkInterfaces();
+  
+  Object.keys(networkInterfaces).forEach(interfaceName => {
+    networkInterfaces[interfaceName].forEach(interface => {
+      if (interface.family === 'IPv4' && !interface.internal) {
+        addresses.push({
+          interface: interfaceName,
+          address: interface.address,
+          url: `http://${interface.address}:${PORT}`
+        });
+      }
+    });
+  });
+  
+  return addresses;
+}
+
+app.listen(PORT, HOST, () => {
+  console.log('\n🚀 IP Management System запущен!');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`📍 Хост: ${HOST}`);
+  console.log(`🔌 Порт: ${PORT}`);
+  console.log(`🌍 Окружение: ${networkConfig.server.environment}`);
+  console.log('');
+  
+  // Локальные адреса
+  console.log('🏠 Локальный доступ:');
+  console.log(`   http://localhost:${PORT}`);
+  console.log(`   http://127.0.0.1:${PORT}`);
+  console.log('');
+  
+  // Сетевые адреса
+  const networkAddresses = getNetworkAddresses();
+  if (networkAddresses.length > 0) {
+    console.log('🌐 Доступ из локальной сети:');
+    networkAddresses.forEach(addr => {
+      console.log(`   ${addr.url} (${addr.interface})`);
+    });
+    console.log('');
+    console.log('💡 Подключайтесь с любого устройства в сети используя эти адреса!');
+  } else {
+    console.log('⚠️  Сетевые интерфейсы не найдены');
+  }
+  
+  console.log('');
+  console.log('🔐 Данные для входа:');
+  console.log('   👤 Логин: admin');
+  console.log('   🔑 Пароль: admin123');
+  console.log('');
+  console.log('📋 Полезные команды:');
+  console.log('   npm run info     - показать сетевую информацию');
+  console.log('   npm run network  - запуск для сети');
+  console.log('   npm run dev      - режим разработки');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('✅ Готов к работе!\n');
 });
