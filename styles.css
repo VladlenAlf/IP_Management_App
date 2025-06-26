@@ -358,6 +358,12 @@ textarea {
     border-left: 4px solid #e74c3c;
 }
 
+/* Стили для чекбокса подтверждения */
+.form-group input[type="checkbox"] {
+    width: auto;
+    margin-right: 8px;
+}
+
 /* Импорт/экспорт */
 .import-section {
     max-width: 600px;
@@ -401,6 +407,7 @@ textarea {
 .action-delete_subnet,
 .action-delete_ip { background: #f8d7da; color: #721c24; }
 .action-bulk_create_ip,
+.action-bulk_delete_ip,
 .action-import_excel { background: #d1e7dd; color: #0f5132; }
 
 .pagination {
@@ -559,11 +566,23 @@ textarea {
     color: #27ae60;
 }
 
-.stat-label {
-    color: #7f8c8d;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+/* Специальные стили для модального окна массового удаления */
+.bulk-delete-warning {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-left: 4px solid #ffc107;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+}
+
+.bulk-delete-warning strong {
+    color: #856404;
+}
+
+.bulk-delete-warning p {
+    margin: 0;
+    color: #856404;
 }
 
 /* Адаптивность */

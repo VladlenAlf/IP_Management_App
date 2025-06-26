@@ -219,18 +219,18 @@ async function checkAuthAndInit() {
 function updateUserInfo() {
     const userInfoElement = document.getElementById('userInfo');
     if (currentUser) {
-        userInfoElement.textContent = `Привет, ${currentUser.username}!`;
+        userInfoElement.textContent = `Cześć, ${currentUser.username}!`;
     }
 }
 
 // Выход из системы
 async function logout() {
-    if (confirm('Вы уверены, что хотите выйти из системы?')) {
+    if (confirm('Czy na pewno chcesz się wylogować?')) {
         try {
             await API.logout();
             window.location.href = '/login.html';
         } catch (error) {
-            showMessage('Ошибка при выходе из системы', 'error');
+            showMessage('Błąd podczas wylogowywania', 'error');
         }
     }
 }
@@ -379,7 +379,7 @@ function updateIpUsageChart(stats) {
     charts.ipUsage = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: ['Занято', 'Свободно'],
+            labels: ['Zajęte', 'Wolne'],
             datasets: [{
                 data: [stats.occupied_ips || 0, stats.free_ips || 0],
                 backgroundColor: ['#e74c3c', '#27ae60'],
@@ -416,12 +416,12 @@ function updateSubnetsChart(data) {
             labels: data.map(item => `${item.network}/${item.mask}`),
             datasets: [
                 {
-                    label: 'Занято',
+                    label: 'Zajęte',
                     data: data.map(item => item.occupied_count),
                     backgroundColor: '#e74c3c'
                 },
                 {
-                    label: 'Свободно',
+                    label: 'Wolne',
                     data: data.map(item => item.free_count),
                     backgroundColor: '#27ae60'
                 }
@@ -464,7 +464,7 @@ function updateCompaniesChart(data) {
         data: {
             labels: data.map(item => item.company),
             datasets: [{
-                label: 'IP адресов',
+                label: 'Adresów IP',
                 data: data.map(item => item.ip_count),
                 backgroundColor: '#3498db'
             }]
@@ -503,10 +503,10 @@ function updateMonthlyChart(data) {
         data: {
             labels: data.map(item => {
                 const date = new Date(item.month + '-01');
-                return date.toLocaleDateString('ru-RU', { year: 'numeric', month: 'short' });
+                return date.toLocaleDateString('pl-PL', { year: 'numeric', month: 'short' });
             }),
             datasets: [{
-                label: 'Выдано IP адресов',
+                label: 'Przydzielone adresy IP',
                 data: data.map(item => item.count),
                 borderColor: '#3498db',
                 backgroundColor: 'rgba(52, 152, 219, 0.1)',
@@ -547,7 +547,7 @@ function updateUtilizationChart(data) {
         data: {
             labels: data.map(item => `${item.network}/${item.mask}`),
             datasets: [{
-                label: 'Утилизация (%)',
+                label: 'Wykorzystanie (%)',
                 data: data.map(item => item.utilization),
                 backgroundColor: data.map(item => {
                     if (item.utilization >= 80) return '#e74c3c';
@@ -587,85 +587,96 @@ function updateUtilizationChart(data) {
     });
 }
 
-// Обновление фильтров подсетей
-function updateSubnetFilters() {
-    const subnetFilter = document.getElementById('subnetFilter');
-    const ipSubnet = document.getElementById('ipSubnet');
-    const analyticsSubnetFilter = document.getElementById('analyticsSubnetFilter');
+// Модальные окна
+function showAddIpModal() {
+    document.getElementById('ipModalTitle').textContent = 'Dodaj adres IP';
+    document.getElementById('ipForm').reset();
+    document.getElementById('ipId').value = '';
+    document.getElementById('ipModal').style.display = 'block';
+}
+
+function showAddSubnetModal() {
+    document.getElementById('subnetModalTitle').textContent = 'Dodaj podsieć';
+    document.getElementById('subnetForm').reset();
+    document.getElementById('subnetId').value = '';
+    document.getElementById('subnetModal').style.display = 'block';
+}
+
+function showBulkIpModal() {
+    document.getElementById('bulkIpForm').reset();
+    updateBulkSubnetOptions();
+    document.getElementById('bulkIpModal').style.display = 'block';
+}
+
+function showBulkDeleteIpModal() {
+    document.getElementById('bulkDeleteIpForm').reset();
+    updateDeleteSubnetOptions();
+    document.getElementById('bulkDeleteIpModal').style.display = 'block';
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+
+// Редактирование IP
+function editIp(id) {
+    const ip = ipAddresses.find(ip => ip.id === id);
+    if (!ip) return;
+
+    document.getElementById('ipModalTitle').textContent = 'Edytuj adres IP';
+    document.getElementById('ipId').value = ip.id;
+    document.getElementById('ipAddress').value = ip.ip_address;
+    document.getElementById('ipSubnet').value = ip.subnet_id || '';
+    document.getElementById('companyName').value = ip.company_name || '';
+    document.getElementById('assignedDate').value = ip.assigned_date || '';
+    document.getElementById('isOccupied').checked = ip.is_occupied;
+    document.getElementById('ipDescription').value = ip.description || '';
     
-    // Очистка существующих опций
-    if (subnetFilter) subnetFilter.innerHTML = '<option value="">Все подсети</option>';
-    if (ipSubnet) ipSubnet.innerHTML = '<option value="">Без подсети</option>';
-    if (analyticsSubnetFilter) analyticsSubnetFilter.innerHTML = '<option value="">Все подсети</option>';
+    document.getElementById('ipModal').style.display = 'block';
+}
+
+// Редактирование подсети
+function editSubnet(id) {
+    const subnet = subnets.find(s => s.id === id);
+    if (!subnet) return;
+
+    document.getElementById('subnetModalTitle').textContent = 'Edytuj podsieć';
+    document.getElementById('subnetId').value = subnet.id;
+    document.getElementById('subnetNetwork').value = subnet.network;
+    document.getElementById('subnetMask').value = subnet.mask;
+    document.getElementById('subnetDescription').value = subnet.description || '';
+    
+    document.getElementById('subnetModal').style.display = 'block';
+}
+
+// Обновление опций подсетей для массового добавления
+function updateBulkSubnetOptions() {
+    const bulkSubnet = document.getElementById('bulkSubnet');
+    if (!bulkSubnet) return;
+    
+    bulkSubnet.innerHTML = '<option value="">Wybierz podsieć</option>';
     
     subnets.forEach(subnet => {
         const option = document.createElement('option');
         option.value = subnet.id;
         option.textContent = `${subnet.network}/${subnet.mask}`;
-        
-        if (subnetFilter) subnetFilter.appendChild(option.cloneNode(true));
-        if (ipSubnet) ipSubnet.appendChild(option.cloneNode(true));
-        if (analyticsSubnetFilter) analyticsSubnetFilter.appendChild(option.cloneNode(true));
+        bulkSubnet.appendChild(option);
     });
-    
-    // Также обновляем опции для массового добавления
-    updateBulkSubnetOptions();
 }
 
-// Удаление IP
-async function deleteIp(id) {
-    if (!confirm('Вы уверены, что хотите удалить этот IP адрес?')) return;
+// Обновление опций подсетей для массового удаления
+function updateDeleteSubnetOptions() {
+    const deleteSubnet = document.getElementById('deleteSubnet');
+    if (!deleteSubnet) return;
     
-    try {
-        await API.deleteIpAddress(id);
-        showMessage('IP адрес успешно удален', 'success');
-        loadIpAddresses();
-        loadStats();
-    } catch (error) {
-        showMessage('Ошибка при удалении IP адреса', 'error');
-    }
-}
-
-// Удаление подсети
-async function deleteSubnet(id) {
-    if (!confirm('Вы уверены, что хотите удалить эту подсеть? Все связанные IP адреса будут отвязаны от неё.')) return;
+    deleteSubnet.innerHTML = '<option value="">Wszystkie podsieci</option>';
     
-    try {
-        await API.deleteSubnet(id);
-        showMessage('Подсеть успешно удалена', 'success');
-        loadSubnets();
-        loadIpAddresses(); // Обновляем список IP адресов
-        loadStats();
-    } catch (error) {
-        showMessage('Ошибка при удалении подсети', 'error');
-    }
-}
-
-// Фильтрация IP адресов
-function filterIPs() {
-    const filters = {
-        subnet_id: document.getElementById('subnetFilter').value,
-        occupied: document.getElementById('statusFilter').value,
-        search: document.getElementById('searchInput').value
-    };
-    
-    loadIpAddresses(filters);
-}
-
-// Фильтрация логов
-function filterLogs() {
-    const filters = {
-        action: document.getElementById('actionFilter').value,
-        entity_type: document.getElementById('entityFilter').value,
-        username: document.getElementById('userFilter').value
-    };
-    
-    loadAuditLogs(1, filters);
-}
-
-// Обновление логов
-function refreshLogs() {
-    loadAuditLogs(currentLogsPage, logsFilters);
+    subnets.forEach(subnet => {
+        const option = document.createElement('option');
+        option.value = subnet.id;
+        option.textContent = `${subnet.network}/${subnet.mask}`;
+        deleteSubnet.appendChild(option);
+    });
 }
 
 // Управление табами
@@ -694,77 +705,6 @@ function showTab(tabName) {
     currentTab = tabName;
 }
 
-// Модальные окна
-function showAddIpModal() {
-    document.getElementById('ipModalTitle').textContent = 'Добавить IP адрес';
-    document.getElementById('ipForm').reset();
-    document.getElementById('ipId').value = '';
-    document.getElementById('ipModal').style.display = 'block';
-}
-
-function showAddSubnetModal() {
-    document.getElementById('subnetModalTitle').textContent = 'Добавить подсеть';
-    document.getElementById('subnetForm').reset();
-    document.getElementById('subnetId').value = '';
-    document.getElementById('subnetModal').style.display = 'block';
-}
-
-function showBulkIpModal() {
-    document.getElementById('bulkIpForm').reset();
-    updateBulkSubnetOptions();
-    document.getElementById('bulkIpModal').style.display = 'block';
-}
-
-function closeModal(modalId) {
-    document.getElementById(modalId).style.display = 'none';
-}
-
-// Редактирование IP
-function editIp(id) {
-    const ip = ipAddresses.find(ip => ip.id === id);
-    if (!ip) return;
-
-    document.getElementById('ipModalTitle').textContent = 'Редактировать IP адрес';
-    document.getElementById('ipId').value = ip.id;
-    document.getElementById('ipAddress').value = ip.ip_address;
-    document.getElementById('ipSubnet').value = ip.subnet_id || '';
-    document.getElementById('companyName').value = ip.company_name || '';
-    document.getElementById('assignedDate').value = ip.assigned_date || '';
-    document.getElementById('isOccupied').checked = ip.is_occupied;
-    document.getElementById('ipDescription').value = ip.description || '';
-    
-    document.getElementById('ipModal').style.display = 'block';
-}
-
-// Редактирование подсети
-function editSubnet(id) {
-    const subnet = subnets.find(s => s.id === id);
-    if (!subnet) return;
-
-    document.getElementById('subnetModalTitle').textContent = 'Редактировать подсеть';
-    document.getElementById('subnetId').value = subnet.id;
-    document.getElementById('subnetNetwork').value = subnet.network;
-    document.getElementById('subnetMask').value = subnet.mask;
-    document.getElementById('subnetDescription').value = subnet.description || '';
-    
-    document.getElementById('subnetModal').style.display = 'block';
-}
-
-// Обновление опций подсетей для массового добавления
-function updateBulkSubnetOptions() {
-    const bulkSubnet = document.getElementById('bulkSubnet');
-    if (!bulkSubnet) return;
-    
-    bulkSubnet.innerHTML = '<option value="">Выберите подсеть</option>';
-    
-    subnets.forEach(subnet => {
-        const option = document.createElement('option');
-        option.value = subnet.id;
-        option.textContent = `${subnet.network}/${subnet.mask}`;
-        bulkSubnet.appendChild(option);
-    });
-}
-
 // Настройка обработчиков событий
 function setupEventListeners() {
     // Форма добавления/редактирования IP
@@ -786,17 +726,17 @@ function setupEventListeners() {
                 const ipId = document.getElementById('ipId').value;
                 if (ipId) {
                     await API.updateIpAddress(ipId, ipData);
-                    showMessage('IP адрес успешно обновлен', 'success');
+                    showMessage('Adres IP został pomyślnie zaktualizowany', 'success');
                 } else {
                     await API.createIpAddress(ipData);
-                    showMessage('IP адрес успешно добавлен', 'success');
+                    showMessage('Adres IP został pomyślnie dodany', 'success');
                 }
                 
                 closeModal('ipModal');
                 loadIpAddresses();
                 loadStats();
             } catch (error) {
-                showMessage('Ошибка при сохранении IP адреса', 'error');
+                showMessage('Błąd podczas zapisywania adresu IP', 'error');
             }
         });
     }
@@ -817,17 +757,17 @@ function setupEventListeners() {
                 const subnetId = document.getElementById('subnetId').value;
                 if (subnetId) {
                     await API.updateSubnet(subnetId, subnetData);
-                    showMessage('Подсеть успешно обновлена', 'success');
+                    showMessage('Podsieć została pomyślnie zaktualizowana', 'success');
                 } else {
                     await API.createSubnet(subnetData);
-                    showMessage('Подсеть успешно создана', 'success');
+                    showMessage('Podsieć została pomyślnie utworzona', 'success');
                 }
                 
                 closeModal('subnetModal');
                 loadSubnets();
                 loadStats();
             } catch (error) {
-                showMessage('Ошибка при сохранении подсети', 'error');
+                showMessage('Błąd podczas zapisyвания podsieci', 'error');
             }
         });
     }
@@ -853,13 +793,70 @@ function setupEventListeners() {
                 if (result.error) {
                     showMessage(result.error, 'error');
                 } else {
-                    showMessage(`Успешно создано ${result.created_count} IP адресов`, 'success');
+                    showMessage(`Pomyślnie utworzono ${result.created_count} adresów IP`, 'success');
                     closeModal('bulkIpModal');
                     loadIpAddresses();
                     loadStats();
                 }
             } catch (error) {
-                showMessage('Ошибка при массовом создании IP адресов', 'error');
+                showMessage('Błąd podczas masowego tworzenia adresów IP', 'error');
+            }
+        });
+    }
+    
+    // Форма массового удаления IP
+    const bulkDeleteIpForm = document.getElementById('bulkDeleteIpForm');
+    if (bulkDeleteIpForm) {
+        bulkDeleteIpForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const startIp = document.getElementById('deleteStartIp').value;
+            const endIp = document.getElementById('deleteEndIp').value;
+            const subnetId = document.getElementById('deleteSubnet').value;
+            const confirmed = document.getElementById('confirmDelete').checked;
+            
+            if (!confirmed) {
+                showMessage('Należy potwierdzić usunięcie', 'error');
+                return;
+            }
+            
+            // Дополнительное подтверждение
+            const subnetText = subnetId ? 
+                ` w podsieci ${subnets.find(s => s.id == subnetId)?.network}/${subnets.find(s => s.id == subnetId)?.mask}` : 
+                '';
+            
+            const confirmMessage = `Czy na pewno chcesz usunąć WSZYSTKIE adresy IP w zakresie ${startIp} - ${endIp}${subnetText}?\n\nTej operacji NIE MOŻNA cofnąć!`;
+            
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+            
+            const bulkDeleteData = {
+                start_ip: startIp,
+                end_ip: endIp,
+                subnet_id: subnetId || null
+            };
+            
+            try {
+                const result = await API.deleteBulkIpAddresses(bulkDeleteData);
+                
+                if (result.error) {
+                    showMessage(result.error, 'error');
+                } else {
+                    showMessage(result.message, 'success');
+                    
+                    // Показываем детали удаления если есть
+                    if (result.deleted_ips && result.deleted_ips.length > 0) {
+                        console.log('Usunięte adresy IP:', result.deleted_ips);
+                    }
+                    
+                    closeModal('bulkDeleteIpModal');
+                    loadIpAddresses();
+                    loadStats();
+                }
+            } catch (error) {
+                console.error('Błąd:', error);
+                showMessage('Błąd podczas masowego usuwania adresów IP', 'error');
             }
         });
     }
@@ -878,7 +875,7 @@ function handleFileSelect() {
     const file = fileInput.files[0];
     
     if (file && !file.name.match(/\.(xlsx|xls)$/)) {
-        showMessage('Пожалуйста, выберите файл Excel (.xlsx или .xls)', 'error');
+        showMessage('Proszę wybrać plik Excel (.xlsx lub .xls)', 'error');
         fileInput.value = '';
     }
 }
@@ -888,7 +885,7 @@ async function importExcel() {
     const file = fileInput.files[0];
     
     if (!file) {
-        showMessage('Пожалуйста, выберите файл для импорта', 'error');
+        showMessage('Proszę wybrać plik do importu', 'error');
         return;
     }
     
@@ -900,14 +897,14 @@ async function importExcel() {
         showMessage(result.message, 'success');
         
         if (result.errors && result.errors.length > 0) {
-            console.warn('Ошибки импорта:', result.errors);
+            console.warn('Błędy importu:', result.errors);
         }
         
         loadIpAddresses();
         loadStats();
         fileInput.value = '';
     } catch (error) {
-        showMessage('Ошибка при импорте файла', 'error');
+        showMessage('Błąd podczas importu pliku', 'error');
     }
 }
 
@@ -978,13 +975,13 @@ function renderIpTable() {
             <td>${ip.assigned_date || '-'}</td>
             <td>
                 <span class="status-badge ${ip.is_occupied ? 'status-occupied' : 'status-free'}">
-                    ${ip.is_occupied ? 'Занят' : 'Свободен'}
+                    ${ip.is_occupied ? 'Zajęty' : 'Wolny'}
                 </span>
             </td>
             <td>${ip.description || '-'}</td>
             <td>
-                <button class="btn btn-small btn-primary" onclick="editIp(${ip.id})">Изменить</button>
-                <button class="btn btn-small btn-danger" onclick="deleteIp(${ip.id})">Удалить</button>
+                <button class="btn btn-small btn-primary" onclick="editIp(${ip.id})">Edytuj</button>
+                <button class="btn btn-small btn-danger" onclick="deleteIp(${ip.id})">Usuń</button>
             </td>
         `;
         tbody.appendChild(row);
@@ -995,7 +992,7 @@ function renderIpTable() {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td colspan="7" style="text-align: center; color: #7f8c8d; padding: 40px;">
-                Нет IP адресов для отображения
+                Brak adresów IP do wyświetlenia
             </td>
         `;
         tbody.appendChild(row);
@@ -1017,8 +1014,8 @@ function renderSubnetsTable() {
             <td>${subnet.description || '-'}</td>
             <td>${new Date(subnet.created_date).toLocaleDateString()}</td>
             <td>
-                <button class="btn btn-small btn-primary" onclick="editSubnet(${subnet.id})">Изменить</button>
-                <button class="btn btn-small btn-danger" onclick="deleteSubnet(${subnet.id})">Удалить</button>
+                <button class="btn btn-small btn-primary" onclick="editSubnet(${subnet.id})">Edytuj</button>
+                <button class="btn btn-small btn-danger" onclick="deleteSubnet(${subnet.id})">Usuń</button>
             </td>
         `;
         tbody.appendChild(row);
@@ -1037,23 +1034,23 @@ function renderLogsTable(logs) {
         
         // Форматируем действие для отображения
         const actionMap = {
-            'LOGIN_SUCCESS': 'Вход в систему',
-            'LOGIN_FAILED': 'Неудачный вход',
-            'LOGOUT': 'Выход из системы',
-            'CREATE_SUBNET': 'Создание подсети',
-            'UPDATE_SUBNET': 'Изменение подсети',
-            'DELETE_SUBNET': 'Удаление подсети',
-            'CREATE_IP': 'Создание IP',
-            'UPDATE_IP': 'Изменение IP',
-            'DELETE_IP': 'Удаление IP',
-            'BULK_CREATE_IP': 'Массовое создание IP',
-            'IMPORT_EXCEL': 'Импорт из Excel'
+            'LOGIN_SUCCESS': 'Logowanie do systemu',
+            'LOGIN_FAILED': 'Nieudane logowanie',
+            'LOGOUT': 'Wylogowanie z systemu',
+            'CREATE_SUBNET': 'Tworzenie podsieci',
+            'UPDATE_SUBNET': 'Modyfikacja podsieci',
+            'DELETE_SUBNET': 'Usuwanie podsieci',
+            'CREATE_IP': 'Tworzenie IP',
+            'UPDATE_IP': 'Modyfikacja IP',
+            'DELETE_IP': 'Usuwanie IP',
+            'BULK_CREATE_IP': 'Masowe tworzenie IP',
+            'IMPORT_EXCEL': 'Import z Excel'
         };
         
         const entityMap = {
-            'user': 'Пользователь',
-            'subnet': 'Подсеть',
-            'ip_address': 'IP адрес'
+            'user': 'Użytkownik',
+            'subnet': 'Podsieć',
+            'ip_address': 'Adres IP'
         };
         
         const actionText = actionMap[log.action] || log.action;
@@ -1065,7 +1062,7 @@ function renderLogsTable(logs) {
             <td><span class="action-badge action-${log.action.toLowerCase()}">${actionText}</span></td>
             <td>${entityText}</td>
             <td>${log.entity_id || '-'}</td>
-            <td><button class="btn btn-small btn-secondary" onclick="showLogDetails(${log.id})">Детали</button></td>
+            <td><button class="btn btn-small btn-secondary" onclick="showLogDetails(${log.id})">Szczegóły</button></td>
             <td>${log.ip_address || '-'}</td>
         `;
         tbody.appendChild(row);
@@ -1075,7 +1072,7 @@ function renderLogsTable(logs) {
         const row = document.createElement('tr');
         row.innerHTML = `
             <td colspan="7" style="text-align: center; color: #7f8c8d; padding: 40px;">
-                Нет логов для отображения
+                Brak logów do wyświetlenia
             </td>
         `;
         tbody.appendChild(row);
@@ -1107,7 +1104,7 @@ function renderLogsPagination(data) {
     if (data.page > 1) {
         const prevBtn = document.createElement('button');
         prevBtn.className = 'btn btn-secondary btn-small';
-        prevBtn.textContent = 'Предыдущая';
+        prevBtn.textContent = 'Poprzednia';
         prevBtn.onclick = () => loadAuditLogs(data.page - 1, logsFilters);
         pagination.appendChild(prevBtn);
     }
@@ -1128,7 +1125,7 @@ function renderLogsPagination(data) {
     if (data.page < data.totalPages) {
         const nextBtn = document.createElement('button');
         nextBtn.className = 'btn btn-secondary btn-small';
-        nextBtn.textContent = 'Следующая';
+        nextBtn.textContent = 'Następna';
         nextBtn.onclick = () => loadAuditLogs(data.page + 1, logsFilters);
         pagination.appendChild(nextBtn);
     }
@@ -1136,7 +1133,7 @@ function renderLogsPagination(data) {
     // Информация о страницах
     const info = document.createElement('span');
     info.className = 'pagination-info';
-    info.textContent = `Страница ${data.page} из ${data.totalPages} (всего записей: ${data.total})`;
+    info.textContent = `Strona ${data.page} z ${data.totalPages} (łącznie rekordów: ${data.total})`;
     pagination.appendChild(info);
 }
 
@@ -1156,23 +1153,23 @@ async function showLogDetails(logId) {
         
         // Форматируем действие
         const actionMap = {
-            'LOGIN_SUCCESS': 'Вход в систему',
-            'LOGIN_FAILED': 'Неудачный вход',
-            'LOGOUT': 'Выход из системы',
-            'CREATE_SUBNET': 'Создание подсети',
-            'UPDATE_SUBNET': 'Изменение подсети',
-            'DELETE_SUBNET': 'Удаление подсети',
-            'CREATE_IP': 'Создание IP',
-            'UPDATE_IP': 'Изменение IP',
-            'DELETE_IP': 'Удаление IP',
-            'BULK_CREATE_IP': 'Массовое создание IP',
-            'IMPORT_EXCEL': 'Импорт из Excel'
+            'LOGIN_SUCCESS': 'Logowanie do systemu',
+            'LOGIN_FAILED': 'Nieudane logowanie',
+            'LOGOUT': 'Wylogowanie z systemu',
+            'CREATE_SUBNET': 'Tworzenie podsieci',
+            'UPDATE_SUBNET': 'Modyfikacja podsieci',
+            'DELETE_SUBNET': 'Usuwanie podsieci',
+            'CREATE_IP': 'Tworzenie IP',
+            'UPDATE_IP': 'Modyfikacja IP',
+            'DELETE_IP': 'Usuwanie IP',
+            'BULK_CREATE_IP': 'Masowe tworzenie IP',
+            'IMPORT_EXCEL': 'Import z Excel'
         };
         
         const entityMap = {
-            'user': 'Пользователь',
-            'subnet': 'Подсеть',
-            'ip_address': 'IP адрес'
+            'user': 'Użytkownik',
+            'subnet': 'Podsieć',
+            'ip_address': 'Adres IP'
         };
         
         document.getElementById('logDetailAction').textContent = actionMap[log.action] || log.action;
@@ -1220,4 +1217,94 @@ async function showLogDetails(logId) {
         console.error('Ошибка загрузки деталей лога:', error);
         showMessage('Ошибка загрузки деталей лога', 'error');
     }
+}
+
+// Обновление фильтров подсетей
+function updateSubnetFilters() {
+    const subnetFilter = document.getElementById('subnetFilter');
+    const ipSubnet = document.getElementById('ipSubnet');
+    const analyticsSubnetFilter = document.getElementById('analyticsSubnetFilter');
+    
+    // Очистка существующих опций
+    if (subnetFilter) subnetFilter.innerHTML = '<option value="">Wszystkie podsieci</option>';
+    if (ipSubnet) ipSubnet.innerHTML = '<option value="">Bez podsieci</option>';
+    if (analyticsSubnetFilter) analyticsSubnetFilter.innerHTML = '<option value="">Wszystkie podsieci</option>';
+    
+    subnets.forEach(subnet => {
+        const option = document.createElement('option');
+        option.value = subnet.id;
+        option.textContent = `${subnet.network}/${subnet.mask}`;
+        
+        if (subnetFilter) subnetFilter.appendChild(option.cloneNode(true));
+        if (ipSubnet) ipSubnet.appendChild(option.cloneNode(true));
+        if (analyticsSubnetFilter) analyticsSubnetFilter.appendChild(option.cloneNode(true));
+    });
+    
+    // Также обновляем опции для массового добавления и удаления
+    updateBulkSubnetOptions();
+    updateDeleteSubnetOptions();
+}
+
+// Удаление IP
+async function deleteIp(id) {
+    if (!confirm('Czy na pewno chcesz usunąć ten adres IP?')) return;
+    
+    try {
+        await API.deleteIpAddress(id);
+        showMessage('Adres IP został pomyślnie usunięty', 'success');
+        loadIpAddresses();
+        loadStats();
+    } catch (error) {
+        showMessage('Błąd podczas usuwania adresu IP', 'error');
+    }
+}
+
+// Удаление подсети
+async function deleteSubnet(id) {
+    if (!confirm('Czy na pewno chcesz usunąć tę podsieć? Wszystkie powiązane adresy IP zostaną odłączone od niej.')) return;
+    
+    try {
+        await API.deleteSubnet(id);
+        showMessage('Podsieć została pomyślnie usunięta', 'success');
+        loadSubnets();
+        loadIpAddresses(); // Обновляем список IP адресов
+        loadStats();
+    } catch (error) {
+        showMessage('Błąd podczas usuwania podsieci', 'error');
+    }
+}
+
+// Фильтрация IP адресов
+function filterIPs() {
+    const subnetFilter = document.getElementById('subnetFilter');
+    const statusFilter = document.getElementById('statusFilter');
+    const searchInput = document.getElementById('searchInput');
+    
+    const filters = {
+        subnet_id: subnetFilter ? subnetFilter.value : '',
+        occupied: statusFilter ? statusFilter.value : '',
+        search: searchInput ? searchInput.value : ''
+    };
+    
+    loadIpAddresses(filters);
+}
+
+// Фильтрация логов
+function filterLogs() {
+    const actionFilter = document.getElementById('actionFilter');
+    const entityFilter = document.getElementById('entityFilter');
+    const userFilter = document.getElementById('userFilter');
+    
+    const filters = {
+        action: actionFilter ? actionFilter.value : '',
+        entity_type: entityFilter ? entityFilter.value : '',
+        username: userFilter ? userFilter.value : ''
+    };
+    
+    loadAuditLogs(1, filters);
+}
+
+// Обновление логов
+function refreshLogs() {
+    loadAuditLogs(currentLogsPage, logsFilters);
 }

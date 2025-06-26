@@ -1,178 +1,173 @@
-# IP Management System
+# System Zarządzania Adresami IP
 
-Веб-приложение для администрирования IP адресов с использованием Node.js, Express.js и SQLite3.
+Nowoczesny system internetowy do zarządzania adresami IP z interfejsem w języku polskim.
 
-## Функционал
+## 🚀 Funkcje
 
-- ✅ **Система авторизации** с защищенным доступом
-- ✅ Управление IP адресами (добавление, редактирование, удаление)
-- ✅ Управление подсетями с различными масками (создание, редактирование)
-- ✅ Фильтрация и поиск по IP адресам
-- ✅ Статистика занятых/свободных IP адресов
-- ✅ Импорт данных из Excel файлов
-- ✅ **Работа в локальной сети** - доступ с любых устройств
-- ✅ Минималистичный и удобный интерфейс
-- ✅ Адаптивный дизайн для мобильных устройств
+- **Zarządzanie adresami IP** - Dodawanie, edycja, usuwanie adresów IP
+- **Zarządzanie podsieciami** - Tworzenie i zarządzanie podsieciami
+- **Masowe operacje** - Dodawanie i usuwanie wielu adresów IP jednocześnie
+- **Import z Excel** - Importowanie danych z plików Excel
+- **Analityka** - Szczegółowe wykresy i statystyki wykorzystania
+- **Logi audytu** - Pełne śledzenie wszystkich operacji w systemie
+- **Autoryzacja** - Bezpieczne logowanie użytkowników
+- **Dostęp w sieci** - Możliwość korzystania z różnych urządzeń w sieci lokalnej
 
-## Установка и запуск
+## 📦 Instalacja
 
-1. Установите зависимости:
+### Wymagania
+- Node.js (wersja 14 lub nowsza)
+- npm
+
+### Kroki instalacji
+
+1. **Sklonuj repozytorium**
+```bash
+git clone <url-repozytorium>
+cd ip-management-system
+```
+
+2. **Zainstaluj zależności**
 ```bash
 npm install
 ```
 
-2. Запустите сервер:
-
-**Для локального использования:**
+3. **Uruchom serwer**
 ```bash
 npm start
 ```
 
-**Для доступа из локальной сети:**
-```bash
-npm run network
-```
-
-3. Откройте в браузере один из предложенных адресов
-
-4. Войдите в систему используя:
-   - **Логин**: admin
-   - **Пароль**: admin123
-
-## Сетевая конфигурация
-
-### Запуск для локальной сети
+### Dostępne komendy
 
 ```bash
-# Запуск с привязкой ко всем сетевым интерфейсам
+# Uruchomienie serwera lokalnie
+npm start
+
+# Uruchomienie z dostępem z sieci
 npm run network
 
-# Режим разработки для сети
+# Tryb developera (automatyczne restartowanie)
+npm run dev
+
+# Tryb developera z dostępem z sieci
 npm run network:dev
 
-# Показать доступные сетевые адреса
+# Informacje o sieci
 npm run info
 ```
 
-### Настройка порта
+## 🌐 Dostęp
 
-```bash
-# Запуск на определенном порту
-PORT=8080 npm run network
+### Lokalny dostęp
+- http://localhost:3000
+- http://127.0.0.1:3000
 
-# Или через переменные окружения
-export PORT=8080
-export HOST=0.0.0.0
-npm start
+### Dostęp z sieci lokalnej
+Po uruchomieniu z `npm run network` system będzie dostępny z innych urządzeń w sieci lokalnej.
+
+### Dane logowania
+- **Login**: admin
+- **Hasło**: admin123
+
+## 🛠️ Użytkowanie
+
+### Zarządzanie adresami IP
+1. Przejdź do zakładki "Adresy IP"
+2. Kliknij "Dodaj IP" lub użyj funkcji masowego dodawania
+3. Wypełnij formularz z danymi adresu
+4. Zapisz zmiany
+
+### Zarządzanie podsieciami
+1. Przejdź do zakładki "Podsieci"
+2. Kliknij "Dodaj podsieć"
+3. Wprowadź adres sieci i maskę
+4. Dodaj opis (opcjonalnie)
+
+### Import z Excel
+1. Przejdź do zakładki "Import/Eksport"
+2. Wybierz plik Excel (.xlsx lub .xls)
+3. Kliknij "Importuj"
+
+Obsługiwane kolumny:
+- ip_address (wymagane)
+- company_name
+- assigned_date
+- is_occupied (1 lub 0)
+- description
+
+### Analityka
+Zakładka "Analityka" oferuje:
+- Wykresy wykorzystania IP
+- Statystyki według podsieci
+- Ranking firm według wykorzystania
+- Aktywność w czasie
+
+### Logi audytu
+Wszystkie operacje są śledzone i zapisywane w logach z:
+- Datą i czasem operacji
+- Informacjami o użytkowniku
+- Szczegółami zmiany
+- Adresem IP użytkownika
+
+## 🔧 Konfiguracja
+
+System automatycznie tworzy bazę danych SQLite przy pierwszym uruchomieniu.
+
+### Struktura plików
+```
+├── app.js              # Aplikacja frontendowa
+├── server.js           # Serwer Node.js
+├── index.html          # Główna strona
+├── login.html          # Strona logowania
+├── styles.css          # Arkusze stylów
+├── config/
+│   └── network.js      # Konfiguracja sieci
+├── scripts/
+│   └── network-info.js # Informacje o sieci
+├── package.json        # Zależności npm
+└── README.md          # Ta dokumentacja
 ```
 
-### Доступ с мобильных устройств
+## 🌟 Funkcje sieciowe
 
-1. Убедитесь, что устройства находятся в одной сети
-2. Запустите сервер командой `npm run network`
-3. Используйте один из предложенных сетевых адресов
-4. Откройте адрес в браузере мобильного устройства
+System został skonfigurowany do pracy w sieci lokalnej:
+- Automatyczne wykrywanie adresów IP
+- Bezpieczne sesje dla wielu urządzeń
+- CORS skonfigurowany dla sieci lokalnych
+- Wyświetlanie dostępnych adresów URL przy starcie
 
-Пример: `http://192.168.1.100:3000`
+## 🔒 Bezpieczeństwo
 
-## Безопасность в локальной сети
+- Hashowanie haseł bcrypt
+- Sesje z zabezpieczeniami
+- Logi audytu wszystkich operacji
+- Ograniczenia zapytań (rate limiting)
 
-- Автоматическая настройка CORS для локальных адресов
-- Поддержка диапазонов IP: 192.168.x.x, 10.x.x.x, 172.16-31.x.x
-- Безопасные настройки сессий для работы в сети
-- Все пароли хэшируются с использованием bcrypt
+## 📱 Responsywność
 
-## Структура базы данных
+Interface został zaprojektowany jako responsywny i działa na:
+- Komputerach stacjonarnych
+- Tabletach
+- Telefonach komórkowych
 
-### Таблица `users`
-- `id` - уникальный идентификатор
-- `username` - имя пользователя
-- `password_hash` - хэш пароля
-- `full_name` - полное имя
-- `role` - роль пользователя (admin/user)
-- `created_date` - дата создания
-- `last_login` - последний вход в систему
+## 🐛 Rozwiązywanie problemów
 
-### Таблица `subnets`
-- `id` - уникальный идентификатор
-- `network` - сетевой адрес (например, 192.168.1.0)
-- `mask` - маска подсети (например, 24)
-- `description` - описание подсети
-- `created_date` - дата создания
-
-### Таблица `ip_addresses`
-- `id` - уникальный идентификатор
-- `ip_address` - IP адрес
-- `subnet_id` - связь с подсетью
-- `company_name` - название компании
-- `assigned_date` - дата выдачи
-- `is_occupied` - занят (1) или свободен (0)
-- `description` - описание
-- `created_date` - дата добавления
-
-## Импорт из Excel
-
-Поддерживаемые колонки в Excel файле:
-- `ip_address` - IP адрес (обязательно)
-- `company_name` - название компании
-- `assigned_date` - дата выдачи
-- `is_occupied` - статус (1 - занят, 0 - свободен)
-- `description` - описание
-
-## Доступные команды
-
+### Problemy z połączeniem
 ```bash
-npm start          # Локальный запуск
-npm run dev        # Режим разработки (локально)
-npm run network    # Запуск для локальной сети
-npm run network:dev # Разработка для сети
-npm run info       # Показать сетевую информацию
+# Sprawdź dostępne adresy IP
+npm run info
+
+# Uruchom w trybie sieciowym
+npm run network
 ```
 
-## API Endpoints
+### Resetowanie bazy danych
+Usuń plik `ip_management.db` - zostanie utworzony ponownie przy następnym uruchomieniu.
 
-### Авторизация
-- `POST /api/login` - вход в систему
-- `POST /api/logout` - выход из системы
-- `GET /api/auth-status` - проверка статуса авторизации
+## 📄 Licencja
 
-### Основные API (требуют авторизации)
-- `GET /api/stats` - статистика
-- `GET /api/subnets` - список подсетей
-- `POST /api/subnets` - создание подсети
-- `PUT /api/subnets/:id` - редактирование подсети
-- `GET /api/ip-addresses` - список IP адресов (с фильтрами)
-- `POST /api/ip-addresses` - добавление IP адреса
-- `PUT /api/ip-addresses/:id` - обновление IP адреса
-- `DELETE /api/ip-addresses/:id` - удаление IP адреса
-- `POST /api/import-excel` - импорт из Excel
+MIT License - szczegóły w pliku LICENSE.
 
-## Технологии
+## 🤝 Wsparcie
 
-- **Backend**: Node.js, Express.js, SQLite3, Express-Session, Bcrypt
-- **Frontend**: Vanilla JavaScript, HTML5, CSS3
-- **Сеть**: CORS, настройки для локальной сети
-- **Дополнительно**: Multer (загрузка файлов), XLSX (работа с Excel)
-
-## Системные требования
-
-- Node.js 14+ 
-- NPM 6+
-- Операционная система: Windows, macOS, Linux
-- Сеть: локальная сеть (WiFi/Ethernet)
-
-## Устранение неполадок
-
-### Не удается подключиться из сети
-1. Проверьте, что используете команду `npm run network`
-2. Убедитесь, что устройства в одной сети
-3. Проверьте настройки файервола
-4. Используйте команду `npm run info` для проверки адресов
-
-### Проблемы с CORS
-- Приложение автоматически настроено для локальных сетей
-- Поддерживаются стандартные диапазоны частных IP
-
-## Лицензия
-
-MIT
+W przypadku problemów lub pytań, skontaktuj się z administratorem systemu.

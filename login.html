@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="pl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Вход в систему - IP Management</title>
+    <title>Logowanie do systemu - Zarządzanie IP</title>
     <link rel="stylesheet" href="styles.css">
     <style>
         .login-container {
@@ -114,32 +114,32 @@
     <div class="login-container">
         <div class="login-box">
             <div class="login-header">
-                <h1>🌐 IP Management</h1>
-                <p>Система управления IP адресами</p>
+                <h1>🌐 Zarządzanie IP</h1>
+                <p>System zarządzania adresami IP</p>
             </div>
             
             <form class="login-form" id="loginForm">
                 <div class="form-group">
-                    <input type="text" id="username" placeholder="Имя пользователя" required>
+                    <input type="text" id="username" placeholder="Nazwa użytkownika" required>
                 </div>
                 
                 <div class="form-group">
-                    <input type="password" id="password" placeholder="Пароль" required>
+                    <input type="password" id="password" placeholder="Hasło" required>
                 </div>
                 
                 <button type="submit" class="login-btn" id="loginBtn">
-                    Войти в систему
+                    Zaloguj się
                 </button>
             </form>
             
             <div class="demo-credentials">
-                <h4>Демо-доступ:</h4>
-                <p>Логин: <strong>admin</strong></p>
-                <p>Пароль: <strong>admin123</strong></p>
+                <h4>Dostęp demo:</h4>
+                <p>Login: <strong>admin</strong></p>
+                <p>Hasło: <strong>admin123</strong></p>
             </div>
             
             <div class="login-footer">
-                © 2024 IP Management System
+                © 2024 System Zarządzania IP
             </div>
         </div>
     </div>
@@ -154,7 +154,7 @@
             
             // Показываем загрузку
             loginBtn.disabled = true;
-            loginBtn.textContent = 'Вход...';
+            loginBtn.textContent = 'Logowanie...';
             
             try {
                 const response = await fetch('/api/login', {
@@ -172,14 +172,14 @@
                     window.location.href = '/';
                 } else {
                     // Показываем ошибку
-                    showError(data.error || 'Ошибка входа в систему');
+                    showError(data.error || 'Błąd logowania do systemu');
                     loginBtn.disabled = false;
-                    loginBtn.textContent = 'Войти в систему';
+                    loginBtn.textContent = 'Zaloguj się';
                 }
             } catch (error) {
-                showError('Ошибка соединения с сервером');
+                showError('Błąd połączenia z serwerem');
                 loginBtn.disabled = false;
-                loginBtn.textContent = 'Войти в систему';
+                loginBtn.textContent = 'Zaloguj się';
             }
         });
         
@@ -211,7 +211,7 @@
                 }
             })
             .catch(error => {
-                console.log('Пользователь не авторизован');
+                console.log('Użytkownik nie jest zalogowany');
             });
     </script>
 </body>
