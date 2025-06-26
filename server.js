@@ -657,6 +657,171 @@ app.get('/api/stats', requireAuth, (req, res) => {
   });
 });
 
+// Аналитика - общая статистика с фильтрами
+app.get('/api/analytics/stats', requireAuth, (req, res) => {
+  const { subnet_id, date_from, date_to } = req.query;
+  
+  let query = `SELECT 
+    COUNT(*) as total_ips,
+    SUM(CASE WHEN is_occupied = 1 THEN 1 ELSE 0 END) as occupied_ips,
+    SUM(CASE WHEN is_occupied = 0 THEN 1 ELSE 0 END) as free_ips,
+    (SELECT COUNT(*) FROM subnets) as total_subnets
+    FROM ip_addresses WHERE 1=1`;
+  
+  let params = [];
+  
+  if (subnet_id) {
+    query += " AND subnet_id = ?";
+    params.push(subnet_id);
+  }
+  
+  if (date_from) {
+    query += " AND created_date >= ?";
+    params.push(date_from);
+  }
+  
+  if (date_to) {
+    query += " AND created_date <= ?";
+    params.push(date_to + ' 23:59:59');
+  }
+  
+  db.get(query, params, (err, stats) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    
+    res.json(stats || { total_ips: 0, occupied_ips: 0, free_ips: 0, total_subnets: 0 });
+  });
+});
+
+// Аналитика - IP адреса по подсетям
+app.get('/api/analytics/subnets', requireAuth, (req, res) => {
+  const { date_from, date_to } = req.query;
+  
+  let query = `SELECT 
+    s.network,
+    s.mask,
+    COUNT(ip.id) as ip_count,
+    SUM(CASE WHEN ip.is_occupied = 1 THEN 1 ELSE 0 END) as occupied_count,
+    SUM(CASE WHEN ip.is_occupied = 0 THEN 1 ELSE 0 END) as free_count
+    FROM subnets s
+    LEFT JOIN ip_addresses ip ON s.id = ip.subnet_id`;
+  
+  let params = [];
+  
+  if (date_from || date_to) {
+    query += " AND (ip.id IS NULL";
+    if (date_from) {
+      query += " OR ip.created_date >= ?";
+      params.push(date_from);
+    }
+    if (date_to) {
+      query += " OR ip.created_date <= ?";
+      params.push(date_to + ' 23:59:59');
+    }
+    query += ")";
+  }
+  
+  query += " GROUP BY s.id, s.network, s.mask ORDER BY ip_count DESC LIMIT 10";
+  
+  db.all(query, params, (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json(rows);
+  });
+});
+
+// Аналитика - компании по использованию IP
+app.get('/api/analytics/companies', requireAuth, (req, res) => {
+  const { subnet_id, date_from, date_to } = req.query;
+  
+  let query = `SELECT 
+    COALESCE(company_name, 'Без компании') as company,
+    COUNT(*) as ip_count
+    FROM ip_addresses 
+    WHERE 1=1`;
+  
+  let params = [];
+  
+  if (subnet_id) {
+    query += " AND subnet_id = ?";
+    params.push(subnet_id);
+  }
+  
+  if (date_from) {
+    query += " AND created_date >= ?";
+    params.push(date_from);
+  }
+  
+  if (date_to) {
+    query += " AND created_date <= ?";
+    params.push(date_to + ' 23:59:59');
+  }
+  
+  query += " GROUP BY company_name ORDER BY ip_count DESC LIMIT 10";
+  
+  db.all(query, params, (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json(rows);
+  });
+});
+
+// Аналитика - активность по месяцам
+app.get('/api/analytics/monthly', requireAuth, (req, res) => {
+  const { subnet_id } = req.query;
+  
+  let query = `SELECT 
+    strftime('%Y-%m', created_date) as month,
+    COUNT(*) as count
+    FROM ip_addresses 
+    WHERE created_date >= date('now', '-12 months')`;
+  
+  let params = [];
+  
+  if (subnet_id) {
+    query += " AND subnet_id = ?";
+    params.push(subnet_id);
+  }
+  
+  query += " GROUP BY strftime('%Y-%m', created_date) ORDER BY month";
+  
+  db.all(query, params, (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json(rows);
+  });
+});
+
+// Аналитика - утилизация подсетей
+app.get('/api/analytics/utilization', requireAuth, (req, res) => {
+  const query = `SELECT 
+    s.network,
+    s.mask,
+    COUNT(ip.id) as used_ips,
+    (1 << (32 - s.mask)) - 2 as total_ips,
+    ROUND((COUNT(ip.id) * 100.0) / ((1 << (32 - s.mask)) - 2), 2) as utilization
+    FROM subnets s
+    LEFT JOIN ip_addresses ip ON s.id = ip.subnet_id
+    GROUP BY s.id, s.network, s.mask
+    ORDER BY utilization DESC`;
+  
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json(rows);
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`Сервер запущен на http://localhost:${PORT}`);
 });

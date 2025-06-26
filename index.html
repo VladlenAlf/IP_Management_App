@@ -42,6 +42,7 @@
             <button class="tab-button active" onclick="showTab('ip-management')">IP Адреса</button>
             <button class="tab-button" onclick="showTab('subnet-management')">Подсети</button>
             <button class="tab-button" onclick="showTab('import-export')">Импорт/Экспорт</button>
+            <button class="tab-button" onclick="showTab('analytics')">Аналитика</button>
             <button class="tab-button" onclick="showTab('audit-logs')">Логи системы</button>
         </nav>
 
@@ -117,6 +118,79 @@
                 </div>
                 <div class="import-info">
                     <p>Поддерживаемые колонки: ip_address, company_name, assigned_date, is_occupied, description</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytics Tab -->
+        <div id="analytics" class="tab-content">
+            <div class="toolbar">
+                <div class="analytics-filters">
+                    <select id="analyticsSubnetFilter" onchange="updateAnalytics()">
+                        <option value="">Все подсети</option>
+                    </select>
+                    
+                    <input type="date" id="analyticsDateFrom" onchange="updateAnalytics()">
+                    <span>до</span>
+                    <input type="date" id="analyticsDateTo" onchange="updateAnalytics()">
+                    
+                    <button class="btn btn-secondary" onclick="resetAnalyticsFilters()">Сбросить фильтры</button>
+                    <button class="btn btn-primary" onclick="updateAnalytics()">Обновить</button>
+                </div>
+            </div>
+
+            <div class="analytics-grid">
+                <!-- Main Stats Cards -->
+                <div class="analytics-card">
+                    <h3>📊 Общая статистика</h3>
+                    <div class="stats-mini">
+                        <div class="stat-mini">
+                            <span class="stat-value" id="analyticsTotal">0</span>
+                            <span class="stat-label">Всего IP</span>
+                        </div>
+                        <div class="stat-mini">
+                            <span class="stat-value occupied" id="analyticsOccupied">0</span>
+                            <span class="stat-label">Занято</span>
+                        </div>
+                        <div class="stat-mini">
+                            <span class="stat-value free" id="analyticsFree">0</span>
+                            <span class="stat-label">Свободно</span>
+                        </div>
+                        <div class="stat-mini">
+                            <span class="stat-value" id="analyticsSubnets">0</span>
+                            <span class="stat-label">Подсетей</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- IP Usage Pie Chart -->
+                <div class="analytics-card">
+                    <h3>🥧 Использование IP адресов</h3>
+                    <canvas id="ipUsageChart"></canvas>
+                </div>
+
+                <!-- Subnets Bar Chart -->
+                <div class="analytics-card">
+                    <h3>📈 IP адреса по подсетям</h3>
+                    <canvas id="subnetsChart"></canvas>
+                </div>
+
+                <!-- Companies Bar Chart -->
+                <div class="analytics-card">
+                    <h3>🏢 Топ компаний по использованию IP</h3>
+                    <canvas id="companiesChart"></canvas>
+                </div>
+
+                <!-- Monthly Activity Line Chart -->
+                <div class="analytics-card chart-wide">
+                    <h3>📅 Активность по месяцам (выдача IP адресов)</h3>
+                    <canvas id="monthlyChart"></canvas>
+                </div>
+
+                <!-- Subnet Utilization -->
+                <div class="analytics-card chart-wide">
+                    <h3>📊 Утилизация подсетей (%)</h3>
+                    <canvas id="utilizationChart"></canvas>
                 </div>
             </div>
         </div>
@@ -368,6 +442,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
