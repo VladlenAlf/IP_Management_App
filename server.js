@@ -36,7 +36,23 @@ app.use(session(networkConfig.session));
 const upload = multer({ dest: 'uploads/' });
 
 // Инициализация базы данных
-const db = new sqlite3.Database('ip_management.db');
+const fs = require('fs');
+const dbPath = process.env.DB_PATH || './data/ip_management.db';
+
+// Создаем директорию для базы данных если её нет
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+}
+
+const db = new sqlite3.Database(dbPath, (err) => {
+    if (err) {
+        console.error('Error opening database:', err);
+        process.exit(1);
+    } else {
+        console.log('Connected to SQLite database at:', dbPath);
+    }
+});
 
 // Создание таблиц
 db.serialize(() => {

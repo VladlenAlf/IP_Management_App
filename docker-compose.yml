@@ -1,0 +1,47 @@
+services:
+  ip-management:
+    build: .
+    container_name: ip-management-system
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - HOST=0.0.0.0
+      - PORT=3000
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - SESSION_SECRET=${SESSION_SECRET:-ip-management-secret-key-2024}
+    volumes:
+      # Монтируем базу данных для сохранения данных
+      - ./data:/app/data
+      # Монтируем uploads для сохранения загруженных файлов
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+    networks:
+      - ip-management-network
+
+  # Дополнительный сервис для резервного копирования (опционально)
+  backup:
+    image: alpine:latest
+    container_name: ip-management-backup
+    volumes:
+      - ./data:/backup/data:ro
+      - ./backups:/backup/output
+    command: >
+      sh -c "
+        while true; do
+          echo 'Creating backup...'
+          tar -czf /backup/output/backup-$$(date +%Y%m%d_%H%M%S).tar.gz -C /backup data
+          echo 'Backup created'
+          # Удаляем старые бэкапы (старше 30 дней)
+          find /backup/output -name '*.tar.gz' -mtime +30 -delete
+          sleep 86400  # 24 часа
+        done
+      "
+    restart: unless-stopped
+    depends_on:
+      - ip-management
+
+networks:
+  ip-management-network:
+    driver: bridge

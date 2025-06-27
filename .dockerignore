@@ -1,0 +1,28 @@
+# Docker
+*.log
+.DS_Store
+.git
+.gitignore
+README.md
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Локальные файлы разработки
+node_modules
+npm-debug.log*
+.nyc_output
+
+# Временные файлы
+*.tmp
+*.temp
+
+# Файлы IDE
+.vscode
+.idea
+
+# Локальные переменные окружения (будут переданы через docker-compose)
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local

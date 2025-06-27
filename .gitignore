@@ -9,6 +9,10 @@ yarn-error.log*
 *.sqlite
 *.sqlite3
 
+# Docker volumes
+data/
+backups/
+
 # Pliki środowiska
 .env
 .env.local

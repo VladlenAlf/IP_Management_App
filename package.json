@@ -8,7 +8,17 @@
     "dev": "nodemon server.js",
     "network": "HOST=0.0.0.0 node server.js",
     "network:dev": "HOST=0.0.0.0 nodemon server.js",
-    "info": "node scripts/network-info.js"
+    "info": "node scripts/network-info.js",
+    "docker:build": "docker build -t ip-management-system .",
+    "docker:run": "docker run -p 3000:3000 --name ip-management ip-management-system",
+    "docker:stop": "docker stop ip-management",
+    "docker:remove": "docker rm ip-management",
+    "docker:compose:up": "docker compose up -d",
+    "docker:compose:down": "docker compose down",
+    "docker:compose:logs": "docker compose logs -f",
+    "docker:compose:build": "docker compose build --no-cache",
+    "docker:compose:restart": "docker compose restart",
+    "docker:compose:ps": "docker compose ps"
   },
   "keywords": [
     "ip-management",
