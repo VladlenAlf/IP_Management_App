@@ -9,6 +9,9 @@ const bcrypt = require('bcrypt');
 const os = require('os');
 const networkConfig = require('./config/network');
 
+// Загружаем переменные окружения
+require('dotenv').config();
+
 // Устанавливаем временную зону для Польши
 process.env.TZ = 'Europe/Warsaw';
 
@@ -49,9 +52,12 @@ db.serialize(() => {
   )`);
 
   // Создание администратора по умолчанию
-  const defaultPassword = bcrypt.hashSync('admin123', 10);
+  const adminUsername = process.env.ADMIN_USERNAME || 'admin';
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+  const defaultPasswordHash = bcrypt.hashSync(adminPassword, 10);
+  
   db.run(`INSERT OR IGNORE INTO users (username, password_hash, full_name, role) 
-          VALUES ('admin', ?, 'Администратор', 'admin')`, [defaultPassword]);
+          VALUES (?, ?, 'Администратор', 'admin')`, [adminUsername, defaultPasswordHash]);
 
   // Таблица подсетей
   db.run(`CREATE TABLE IF NOT EXISTS subnets (
@@ -999,8 +1005,8 @@ app.listen(PORT, HOST, () => {
   
   console.log('');
   console.log('🔐 Данные для входа:');
-  console.log('   👤 Логин: admin');
-  console.log('   🔑 Пароль: admin123');
+  console.log(`   👤 Логин: ${process.env.ADMIN_USERNAME || 'admin'}`);
+  console.log(`   🔑 Пароль: ${process.env.ADMIN_PASSWORD || 'admin123'}`);
   console.log('');
   console.log('📋 Полезные команды:');
   console.log('   npm run info     - показать сетевую информацию');

@@ -32,7 +32,20 @@ cd ip-management-system
 npm install
 ```
 
-3. **Uruchom serwer**
+3. **Konfiguracja**
+Skopiuj plik `.env.example` na `.env` i dostosuj ustawienia:
+```bash
+cp .env.example .env
+```
+
+Edytuj plik `.env` aby ustawić własne dane logowania:
+```
+ADMIN_USERNAME=twoj_login
+ADMIN_PASSWORD=twoje_haslo
+NODE_ENV=production
+```
+
+4. **Uruchom serwer**
 ```bash
 npm start
 ```
