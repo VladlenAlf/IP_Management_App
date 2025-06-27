@@ -1,37 +1,37 @@
-# Docker Setup для System Zarządzania Adresami IP
+# Docker Setup dla System Zarządzania Adresami IP
 
-## 🐳 Быстрый старт с Docker
+## 🐳 Szybki start z Docker
 
-### Вариант 1: Docker Compose (рекомендуется)
+### Opcja 1: Docker Compose (zalecane)
 
-1. **Запуск приложения:**
+1. **Uruchomienie aplikacji:**
 ```bash
 docker compose up -d
 ```
 
-2. **Просмотр логов:**
+2. **Podgląd logów:**
 ```bash
 docker compose logs -f
 ```
 
-3. **Остановка:**
+3. **Zatrzymanie:**
 ```bash
 docker compose down
 ```
 
-4. **Проверка статуса:**
+4. **Sprawdzenie statusu:**
 ```bash
 docker compose ps
 ```
 
-### Вариант 2: Docker без Compose
+### Opcja 2: Docker bez Compose
 
-1. **Сборка образа:**
+1. **Budowanie obrazu:**
 ```bash
 docker build -t ip-management-system .
 ```
 
-2. **Запуск контейнера:**
+2. **Uruchomienie kontenera:**
 ```bash
 docker run -d \
   --name ip-management \
@@ -43,108 +43,108 @@ docker run -d \
   ip-management-system
 ```
 
-## 📋 Настройка переменных окружения
+## 📋 Konfiguracja zmiennych środowiskowych
 
-Скопируйте `.env.docker` в `.env` и настройте под ваши нужды:
+Skopiuj `.env.docker` do `.env` i dostosuj do swoich potrzeb:
 
 ```bash
 cp .env.docker .env
 ```
 
-Основные переменные:
-- `ADMIN_USERNAME` - логин администратора
-- `ADMIN_PASSWORD` - пароль администратора  
-- `SESSION_SECRET` - секретный ключ для сессий (обязательно измените!)
-- `NODE_ENV` - окружение (production/development)
+Główne zmienne:
+- `ADMIN_USERNAME` - login administratora
+- `ADMIN_PASSWORD` - hasło administratora  
+- `SESSION_SECRET` - sekretny klucz dla sesji (koniecznie zmień!)
+- `NODE_ENV` - środowisko (production/development)
 
-## 🗂️ Структура томов
+## 🗂️ Struktura wolumenów
 
-- `./data:/app/data` - база данных SQLite
-- `./uploads:/app/uploads` - загруженные файлы
-- `./backups:/backup/output` - резервные копии (опционально)
+- `./data:/app/data` - baza danych SQLite
+- `./uploads:/app/uploads` - przesłane pliki
+- `./backups:/backup/output` - kopie zapasowe (opcjonalnie)
 
-## 🔧 Полезные команды NPM
+## 🔧 Przydatne komendy NPM
 
 ```bash
 # Docker Compose
-npm run docker:compose:up     # Запуск с compose
-npm run docker:compose:down   # Остановка compose
-npm run docker:compose:logs   # Просмотр логов
-npm run docker:compose:build  # Пересборка образов
-npm run docker:compose:ps     # Статус контейнеров
-npm run docker:compose:restart # Перезапуск контейнеров
+npm run docker:compose:up     # Uruchomienie z compose
+npm run docker:compose:down   # Zatrzymanie compose
+npm run docker:compose:logs   # Podgląd logów
+npm run docker:compose:build  # Przebudowa obrazów
+npm run docker:compose:ps     # Status kontenerów
+npm run docker:compose:restart # Restart kontenerów
 
-# Обычный Docker
-npm run docker:build          # Сборка образа
-npm run docker:run           # Запуск контейнера
-npm run docker:stop          # Остановка контейнера
-npm run docker:remove        # Удаление контейнера
+# Zwykły Docker
+npm run docker:build          # Budowanie obrazu
+npm run docker:run           # Uruchomienie kontenera
+npm run docker:stop          # Zatrzymanie kontenera
+npm run docker:remove        # Usunięcie kontenera
 ```
 
-## 🌐 Доступ к приложению
+## 🌐 Dostęp do aplikacji
 
-После запуска приложение будет доступно по адресу:
+Po uruchomieniu aplikacja będzie dostępna pod adresem:
 - http://localhost:3000
 - http://your-server-ip:3000
 
-**Данные для входа:**
-- Логин: admin (или значение из ADMIN_USERNAME)
-- Пароль: admin123 (или значение из ADMIN_PASSWORD)
+**Dane do logowania:**
+- Login: admin (lub wartość z ADMIN_USERNAME)
+- Hasło: admin123 (lub wartość z ADMIN_PASSWORD)
 
-## 🔒 Безопасность
+## 🔒 Bezpieczeństwo
 
-1. **Обязательно измените пароли по умолчанию!**
-2. Используйте сильный `SESSION_SECRET`
-3. При развертывании в продакшене настройте firewall
-4. Рассмотрите использование reverse proxy (nginx) с SSL
+1. **Koniecznie zmień domyślne hasła!**
+2. Używaj silnego `SESSION_SECRET`
+3. Przy wdrażaniu w produkcji skonfiguruj firewall
+4. Rozważ użycie reverse proxy (nginx) z SSL
 
-## 📦 Резервное копирование
+## 📦 Kopie zapasowe
 
-Docker Compose включает автоматический сервис резервного копирования:
-- Создает бэкапы каждые 24 часа
-- Сохраняет в папку `./backups/`
-- Автоматически удаляет старые бэкапы (>30 дней)
+Docker Compose zawiera automatyczny serwis kopii zapasowych:
+- Tworzy kopie zapasowe co 24 godziny
+- Zapisuje w folderze `./backups/`
+- Automatycznie usuwa stare kopie zapasowe (>30 dni)
 
-Ручное создание бэкапа:
+Ręczne tworzenie kopii zapasowej:
 ```bash
 docker exec ip-management-backup tar -czf /backup/output/manual-backup-$(date +%Y%m%d_%H%M%S).tar.gz -C /backup data
 ```
 
-## 🔧 Устранение неполадок
+## 🔧 Rozwiązywanie problemów
 
-### Проверка статуса контейнеров:
+### Sprawdzanie statusu kontenerów:
 ```bash
 docker compose ps
-# или
+# lub
 sudo docker ps -a
 ```
 
-### Просмотр логов:
+### Podgląd logów:
 ```bash
 docker compose logs ip-management
-# или для всех сервисов
+# lub dla wszystkich serwisów
 docker compose logs -f
 ```
 
-### Подключение к контейнеру:
+### Połączenie z kontenerem:
 ```bash
 docker exec -it ip-management-system sh
 ```
 
-### Проверка томов:
+### Sprawdzanie wolumenów:
 ```bash
 docker volume ls
 ```
 
-## 📊 Мониторинг
+## 📊 Monitoring
 
-Для продакшен-среды рекомендуется добавить мониторинг:
+Dla środowiska produkcyjnego zaleca się dodanie monitoringu:
 - Health checks
-- Log aggregation
-- Performance monitoring
-- Alerts
+- Agregacja logów
+- Monitoring wydajności
+- Alerty
 
-Пример health check можно добавить в Dockerfile:
+Przykład health check można dodać w Dockerfile:
 ```dockerfile
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3000/api/auth-status || exit 1

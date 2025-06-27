@@ -1,4 +1,4 @@
-// Глобальные переменные
+// Zmienne globalne
 let currentTab = 'ip-management';
 let subnets = [];
 let ipAddresses = [];
@@ -6,10 +6,10 @@ let currentUser = null;
 let currentLogsPage = 1;
 let logsFilters = {};
 
-// Глобальные переменные для графиков
+// Zmienne globalne dla wykresów
 let charts = {};
 
-// API функции
+// Funkcje API
 const API = {
     async checkAuth() {
         const response = await fetch('/api/auth-status');
@@ -113,7 +113,7 @@ const API = {
     },
 
     async deleteBulkIpAddresses(bulkData) {
-        console.log('API: отправляем DELETE запрос с данными:', bulkData);
+        console.log('API: wysyłamy żądanie DELETE z danymi:', bulkData);
         const response = await fetch('/api/ip-addresses/bulk', {
             method: 'DELETE',
             headers: { 'Content-Type': 'application/json' },
@@ -200,12 +200,12 @@ const API = {
     },
 };
 
-// Инициализация приложения
+// Inicjalizacja aplikacji
 document.addEventListener('DOMContentLoaded', function() {
     checkAuthAndInit();
 });
 
-// Проверка авторизации и инициализация
+// Sprawdzanie autoryzacji i inicjalizacja
 async function checkAuthAndInit() {
     try {
         const authStatus = await API.checkAuth();
@@ -228,7 +228,7 @@ async function checkAuthAndInit() {
     }
 }
 
-// Обновление информации о пользователе
+// Aktualizacja informacji o użytkowniku
 function updateUserInfo() {
     const userInfoElement = document.getElementById('userInfo');
     if (currentUser) {
@@ -236,7 +236,7 @@ function updateUserInfo() {
     }
 }
 
-// Выход из системы
+// Wylogowanie z systemu
 async function logout() {
     if (confirm('Czy na pewno chcesz się wylogować?')) {
         try {
@@ -248,7 +248,7 @@ async function logout() {
     }
 }
 
-// Загрузка статистики
+// Ładowanie statystyk
 async function loadStats() {
     try {
         const stats = await API.fetchStats();
@@ -261,7 +261,7 @@ async function loadStats() {
     }
 }
 
-// Загрузка подсетей
+// Ładowanie podsieci
 async function loadSubnets() {
     try {
         subnets = await API.fetchSubnets();
@@ -272,18 +272,18 @@ async function loadSubnets() {
     }
 }
 
-// Загрузка IP адресов
+// Ładowanie adresów IP
 async function loadIpAddresses(filters = {}) {
     try {
         ipAddresses = await API.fetchIpAddresses(filters);
         renderIpTable();
     } catch (error) {
         console.error('Ошибка загрузки IP адресов:', error);
-        showMessage('Ошибка загрузки IP адресов', 'error');
+        showMessage('Błąd ładowania adresów IP', 'error');
     }
 }
 
-// Загрузка логов аудита
+// Ładowanie logów audytu
 async function loadAuditLogs(page = 1, filters = {}) {
     try {
         const data = await API.fetchAuditLogs(page, filters);
@@ -293,26 +293,26 @@ async function loadAuditLogs(page = 1, filters = {}) {
         logsFilters = filters;
     } catch (error) {
         console.error('Ошибка загрузки логов:', error);
-        showMessage('Ошибка загрузки логов аудита', 'error');
+        showMessage('Błąd ładowania logów audytu', 'error');
     }
 }
 
-// Загрузка аналитики
+// Ładowanie analityki
 async function loadAnalytics() {
     try {
         await updateAnalytics();
     } catch (error) {
         console.error('Ошибка загрузки аналитики:', error);
-        showMessage('Ошибка загрузки данных аналитики', 'error');
+        showMessage('Błąd ładowania danych analityki', 'error');
     }
 }
 
-// Обновление аналитики с фильтрами
+// Aktualizacja analityki z filtrami
 async function updateAnalytics() {
     try {
         const filters = getAnalyticsFilters();
         
-        // Загружаем все данные параллельно
+        // Ładujemy wszystkie dane równolegle
         const [stats, subnetsData, companiesData, monthlyData, utilizationData] = await Promise.all([
             API.fetchAnalyticsStats(filters),
             API.fetchAnalyticsSubnets(filters),
@@ -321,10 +321,10 @@ async function updateAnalytics() {
             API.fetchAnalyticsUtilization()
         ]);
         
-        // Обновляем карточки статистики
+        // Aktualizujemy karty statystyk
         updateAnalyticsStats(stats);
         
-        // Обновляем графики
+        // Aktualizujemy wykresy
         updateIpUsageChart(stats);
         updateSubnetsChart(subnetsData);
         updateCompaniesChart(companiesData);
@@ -333,11 +333,11 @@ async function updateAnalytics() {
         
     } catch (error) {
         console.error('Ошибка обновления аналитики:', error);
-        showMessage('Ошибка обновления аналитики', 'error');
+        showMessage('Błąd aktualizacji analityki', 'error');
     }
 }
 
-// Получение фильтров аналитики
+// Pobieranie filtrów analityki
 function getAnalyticsFilters() {
     const subnetFilter = document.getElementById('analyticsSubnetFilter');
     const dateFrom = document.getElementById('analyticsDateFrom');
@@ -350,7 +350,7 @@ function getAnalyticsFilters() {
     };
 }
 
-// Сброс фильтров аналитики
+// Reset filtrów analityki
 function resetAnalyticsFilters() {
     const subnetFilter = document.getElementById('analyticsSubnetFilter');
     const dateFrom = document.getElementById('analyticsDateFrom');
@@ -363,7 +363,7 @@ function resetAnalyticsFilters() {
     updateAnalytics();
 }
 
-// Обновление карточек статистики
+// Aktualizacja kart statystyk
 function updateAnalyticsStats(stats) {
     const elements = {
         analyticsTotal: document.getElementById('analyticsTotal'),
@@ -378,7 +378,7 @@ function updateAnalyticsStats(stats) {
     if (elements.analyticsSubnets) elements.analyticsSubnets.textContent = stats.total_subnets || 0;
 }
 
-// График использования IP адресов (пирог)
+// Wykres wykorzystania adresów IP (kołowy)
 function updateIpUsageChart(stats) {
     const canvas = document.getElementById('ipUsageChart');
     if (!canvas) return;
@@ -412,7 +412,7 @@ function updateIpUsageChart(stats) {
     });
 }
 
-// График IP адресов по подсетям
+// Wykres adresów IP według podsieci
 function updateSubnetsChart(data) {
     const canvas = document.getElementById('subnetsChart');
     if (!canvas) return;
@@ -461,7 +461,7 @@ function updateSubnetsChart(data) {
     });
 }
 
-// График компаний
+// Wykres firm
 function updateCompaniesChart(data) {
     const canvas = document.getElementById('companiesChart');
     if (!canvas) return;
@@ -500,7 +500,7 @@ function updateCompaniesChart(data) {
     });
 }
 
-// График активности по месяцам
+// Wykres aktywności według miesięcy
 function updateMonthlyChart(data) {
     const canvas = document.getElementById('monthlyChart');
     if (!canvas) return;
@@ -544,7 +544,7 @@ function updateMonthlyChart(data) {
     });
 }
 
-// График утилизации подсетей
+// Wykres wykorzystania podsieci
 function updateUtilizationChart(data) {
     const canvas = document.getElementById('utilizationChart');
     if (!canvas) return;
@@ -749,7 +749,7 @@ function setupEventListeners() {
                 loadIpAddresses();
                 loadStats();
             } catch (error) {
-                showMessage('Błąd podczas записывания адреса IP', 'error');
+                showMessage('Błąd podczas zapisywania adresu IP', 'error');
             }
         });
     }
@@ -780,7 +780,7 @@ function setupEventListeners() {
                 loadSubnets();
                 loadStats();
             } catch (error) {
-                showMessage('Błąd podczas записывания подсети', 'error');
+                showMessage('Błąd podczas zapisywania podsieci', 'error');
             }
         });
     }
@@ -812,7 +812,7 @@ function setupEventListeners() {
                     loadStats();
                 }
             } catch (error) {
-                showMessage('Błąd podczas масового tworения адресов IP', 'error');
+                showMessage('Błąd podczas masowego tworzenia adresów IP', 'error');
             }
         });
     }
@@ -872,7 +872,7 @@ function setupEventListeners() {
                 }
             } catch (error) {
                 console.error('Błąd:', error);
-                showMessage('Błąd podczas масового usувания адресов IP', 'error');
+                showMessage('Błąd podczas masowego usuwania adresów IP', 'error');
             }
         });
     }

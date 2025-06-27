@@ -127,7 +127,7 @@
             const password = document.getElementById('password').value;
             const loginBtn = document.getElementById('loginBtn');
             
-            // Показываем загрузку
+            // Pokazujemy ładowanie
             loginBtn.disabled = true;
             loginBtn.textContent = 'Logowanie...';
             
@@ -143,10 +143,10 @@
                 const data = await response.json();
                 
                 if (response.ok) {
-                    // Успешная авторизация - перенаправляем
+                    // Pomyślna autoryzacja - przekierowujemy
                     window.location.href = '/';
                 } else {
-                    // Показываем ошибку
+                    // Pokazujemy błąd
                     showError(data.error || 'Błąd logowania do systemu');
                     loginBtn.disabled = false;
                     loginBtn.textContent = 'Zaloguj się';
@@ -159,7 +159,7 @@
         });
         
         function showError(message) {
-            // Удаляем предыдущие сообщения об ошибках
+            // Usuwamy poprzednie komunikaty o błędach
             const existingError = document.querySelector('.error-message');
             if (existingError) {
                 existingError.remove();
@@ -177,7 +177,7 @@
             }, 5000);
         }
         
-        // Проверяем, авторизован ли пользователь уже
+        // Sprawdzamy, czy użytkownik jest już zalogowany
         fetch('/api/auth-status')
             .then(response => response.json())
             .then(data => {

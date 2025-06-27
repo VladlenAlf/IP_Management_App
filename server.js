@@ -9,37 +9,37 @@ const bcrypt = require('bcrypt');
 const os = require('os');
 const networkConfig = require('./config/network');
 
-// Загружаем переменные окружения
+// Ładujemy zmienne środowiskowe
 require('dotenv').config();
 
-// Устанавливаем временную зону для Польши
+// Ustawiamy strefę czasową dla Polski
 process.env.TZ = 'Europe/Warsaw';
 
 const app = express();
 const { host: HOST, port: PORT } = networkConfig.server;
 
-// Настройка доверия прокси для работы в сети
+// Konfiguracja zaufania proxy dla pracy w sieci
 if (networkConfig.security.trustProxy) {
   app.set('trust proxy', 1);
 }
 
-// Middleware с настройками для сети
+// Middleware z ustawieniami dla sieci
 app.use(cors(networkConfig.cors));
 app.use(express.json());
 app.use(express.static('.'));
 app.use(express.urlencoded({ extended: true }));
 
-// Настройка сессий с конфигурацией для сети
+// Konfiguracja sesji z konfiguracją dla sieci
 app.use(session(networkConfig.session));
 
-// Multer для загрузки файлов
+// Multer do przesyłania plików
 const upload = multer({ dest: 'uploads/' });
 
-// Инициализация базы данных
+// Inicjalizacja bazy danych
 const fs = require('fs');
 const dbPath = process.env.DB_PATH || './data/ip_management.db';
 
-// Создаем директорию для базы данных если её нет
+// Tworzymy katalog dla bazy danych jeśli nie istnieje
 const dbDir = path.dirname(dbPath);
 if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
@@ -47,16 +47,16 @@ if (!fs.existsSync(dbDir)) {
 
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
-        console.error('Error opening database:', err);
+        console.error('Błąd otwierania bazy danych:', err);
         process.exit(1);
     } else {
-        console.log('Connected to SQLite database at:', dbPath);
+        console.log('Połączono z bazą danych SQLite:', dbPath);
     }
 });
 
-// Создание таблиц
+// Tworzenie tabel
 db.serialize(() => {
-  // Таблица пользователей
+  // Tabela użytkowników
   db.run(`CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
@@ -67,15 +67,15 @@ db.serialize(() => {
     last_login DATETIME
   )`);
 
-  // Создание администратора по умолчанию
+  // Tworzenie domyślnego administratora
   const adminUsername = process.env.ADMIN_USERNAME || 'admin';
   const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
   const defaultPasswordHash = bcrypt.hashSync(adminPassword, 10);
   
   db.run(`INSERT OR IGNORE INTO users (username, password_hash, full_name, role) 
-          VALUES (?, ?, 'Администратор', 'admin')`, [adminUsername, defaultPasswordHash]);
+          VALUES (?, ?, 'Administrator', 'admin')`, [adminUsername, defaultPasswordHash]);
 
-  // Таблица подсетей
+  // Tabela podsieci
   db.run(`CREATE TABLE IF NOT EXISTS subnets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     network TEXT NOT NULL,
@@ -84,18 +84,18 @@ db.serialize(() => {
     created_date DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  // Миграция: добавляем уникальное ограничение для существующей таблицы
+  // Migracja: dodajemy ograniczenie unikalności dla istniejącej tabeli
   db.get("PRAGMA table_info(subnets)", (err, info) => {
     if (!err) {
-      // Проверяем, есть ли уже уникальный индекс
+      // Sprawdzamy, czy istnieje już unikalny indeks
       db.get("SELECT name FROM sqlite_master WHERE type='index' AND name='unique_subnet_network_mask'", (err, index) => {
         if (!err && !index) {
-          // Создаем уникальный индекс, если его нет
+          // Tworzymy unikalny indeks, jeśli go nie ma
           db.run("CREATE UNIQUE INDEX unique_subnet_network_mask ON subnets(network, mask)", (err) => {
             if (err) {
-              console.error('Ошибка создания уникального индекса:', err.message);
+              console.error('Błąd tworzenia unikalnego indeksu:', err.message);
             } else {
-              console.log('Уникальный индекс для подсетей создан успешно');
+              console.log('Unikalny indeks dla podsieci utworzony pomyślnie');
             }
           });
         }
@@ -103,7 +103,7 @@ db.serialize(() => {
     }
   });
 
-  // Таблица IP адресов
+  // Tabela adresów IP
   db.run(`CREATE TABLE IF NOT EXISTS ip_addresses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ip_address TEXT NOT NULL UNIQUE,
@@ -116,7 +116,7 @@ db.serialize(() => {
     FOREIGN KEY (subnet_id) REFERENCES subnets (id)
   )`);
 
-  // Таблица логов аудита
+  // Tabela logów audytu
   db.run(`CREATE TABLE IF NOT EXISTS audit_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
@@ -133,7 +133,7 @@ db.serialize(() => {
   )`);
 });
 
-// Функция для записи в лог аудита
+// Funkcja do zapisu w logu audytu
 function logAudit(req, action, entityType, entityId = null, oldValues = null, newValues = null) {
   const logData = {
     user_id: req.session?.userId || null,
@@ -154,21 +154,21 @@ function logAudit(req, action, entityType, entityId = null, oldValues = null, ne
      logData.entity_id, logData.old_values, logData.new_values, logData.ip_address, logData.user_agent],
     function(err) {
       if (err) {
-        console.error('Ошибка записи в лог аудита:', err.message);
+        console.error('Błąd zapisu w logu audytu:', err.message);
       }
     });
 }
 
-// Middleware для проверки авторизации
+// Middleware do sprawdzania autoryzacji
 function requireAuth(req, res, next) {
   if (req.session && req.session.userId) {
     return next();
   } else {
-    return res.status(401).json({ error: 'Необходима авторизация' });
+    return res.status(401).json({ error: 'Wymagana autoryzacja' });
   }
 }
 
-// Маршрут для главной страницы
+// Trasa dla strony głównej
 app.get('/', (req, res) => {
   if (req.session && req.session.userId) {
     res.sendFile(path.join(__dirname, 'index.html'));
@@ -177,9 +177,9 @@ app.get('/', (req, res) => {
   }
 });
 
-// API маршруты авторизации
+// Trasy API autoryzacji
 
-// Вход в систему
+// Logowanie do systemu
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
   
@@ -190,25 +190,25 @@ app.post('/api/login', (req, res) => {
     }
     
     if (!user || !bcrypt.compareSync(password, user.password_hash)) {
-      // Логируем неудачную попытку входа
+      // Logujemy nieudaną próbę logowania
       logAudit(req, 'LOGIN_FAILED', 'user', null, null, { username });
-      res.status(401).json({ error: 'Неверное имя пользователя или пароль' });
+      res.status(401).json({ error: 'Nieprawidłowa nazwa użytkownika lub hasło' });
       return;
     }
     
-    // Обновляем время последнего входа
+    // Aktualizujemy czas ostatniego logowania
     db.run("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?", [user.id]);
     
-    // Создаем сессию
+    // Tworzymy sesję
     req.session.userId = user.id;
     req.session.username = user.username;
     req.session.role = user.role;
     
-    // Логируем успешный вход
+    // Logujemy pomyślne logowanie
     logAudit(req, 'LOGIN_SUCCESS', 'user', user.id, null, { username: user.username });
     
     res.json({ 
-      message: 'Успешная авторизация',
+      message: 'Pomyślna autoryzacja',
       user: {
         id: user.id,
         username: user.username,
@@ -219,21 +219,21 @@ app.post('/api/login', (req, res) => {
   });
 });
 
-// Выход из системы
+// Wylogowanie z systemu
 app.post('/api/logout', (req, res) => {
-  // Логируем выход из системы
+  // Logujemy wylogowanie z systemu
   logAudit(req, 'LOGOUT', 'user', req.session?.userId);
   
   req.session.destroy((err) => {
     if (err) {
-      res.status(500).json({ error: 'Ошибка при выходе из системы' });
+      res.status(500).json({ error: 'Błąd przy wylogowaniu z systemu' });
       return;
     }
-    res.json({ message: 'Успешный выход из системы' });
+    res.json({ message: 'Pomyślne wylogowanie z systemu' });
   });
 });
 
-// Проверка статуса авторизации
+// Sprawdzanie statusu autoryzacji
 app.get('/api/auth-status', (req, res) => {
   if (req.session && req.session.userId) {
     res.json({ 
@@ -249,9 +249,9 @@ app.get('/api/auth-status', (req, res) => {
   }
 });
 
-// API маршруты (теперь защищены авторизацией)
+// Trasy API (teraz chronione autoryzacją)
 
-// Получить все подсети
+// Pobranie wszystkich podsieci
 app.get('/api/subnets', requireAuth, (req, res) => {
   db.all("SELECT * FROM subnets ORDER BY created_date DESC", (err, rows) => {
     if (err) {
@@ -262,7 +262,7 @@ app.get('/api/subnets', requireAuth, (req, res) => {
   });
 });
 
-// Создать подсеть
+// Utworzenie podsieci
 app.post('/api/subnets', requireAuth, (req, res) => {
   const { network, mask, description } = req.body;
   
@@ -271,7 +271,7 @@ app.post('/api/subnets', requireAuth, (req, res) => {
       if (err) {
         logAudit(req, 'CREATE_SUBNET_FAILED', 'subnet', null, null, { network, mask, description, error: err.message });
         if (err.code === 'SQLITE_CONSTRAINT' && err.message.includes('UNIQUE')) {
-          res.status(400).json({ error: `Подсеть ${network}/${mask} уже существует` });
+          res.status(400).json({ error: `Podsieć ${network}/${mask} już istnieje` });
         } else {
           res.status(500).json({ error: err.message });
         }
@@ -284,12 +284,12 @@ app.post('/api/subnets', requireAuth, (req, res) => {
     });
 });
 
-// Редактировать подсеть
+// Edytowanie podsieci
 app.put('/api/subnets/:id', requireAuth, (req, res) => {
   const { id } = req.params;
   const { network, mask, description } = req.body;
   
-  // Сначала получаем старые значения
+  // Najpierw pobieramy stare wartości
   db.get("SELECT * FROM subnets WHERE id = ?", [id], (err, oldSubnet) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -301,25 +301,25 @@ app.put('/api/subnets/:id', requireAuth, (req, res) => {
         if (err) {
           logAudit(req, 'UPDATE_SUBNET_FAILED', 'subnet', id, oldSubnet, { network, mask, description, error: err.message });
           if (err.code === 'SQLITE_CONSTRAINT' && err.message.includes('UNIQUE')) {
-            res.status(400).json({ error: `Подсеть ${network}/${mask} уже существует` });
+            res.status(400).json({ error: `Podsieć ${network}/${mask} już istnieje` });
           } else {
             res.status(500).json({ error: err.message });
           }
           return;
         }
         if (this.changes === 0) {
-          res.status(404).json({ error: 'Подсеть не найдена' });
+          res.status(404).json({ error: 'Podsieć nie została znaleziona' });
           return;
         }
         
         const newSubnet = { id, network, mask, description };
         logAudit(req, 'UPDATE_SUBNET', 'subnet', id, oldSubnet, newSubnet);
-        res.json({ message: 'Подсеть обновлена', id, network, mask, description });
+        res.json({ message: 'Podsieć została zaktualizowana', id, network, mask, description });
       });
   });
 });
 
-// Получить все IP адреса
+// Pobranie wszystkich adresów IP
 app.get('/api/ip-addresses', requireAuth, (req, res) => {
   const { subnet_id, occupied, search } = req.query;
   
@@ -355,7 +355,7 @@ app.get('/api/ip-addresses', requireAuth, (req, res) => {
   });
 });
 
-// Добавить IP адрес
+// Dodanie adresu IP
 app.post('/api/ip-addresses', requireAuth, (req, res) => {
   const { ip_address, subnet_id, company_name, assigned_date, is_occupied, description } = req.body;
   
@@ -375,12 +375,12 @@ app.post('/api/ip-addresses', requireAuth, (req, res) => {
     });
 });
 
-// Обновить IP адрес
+// Aktualizacja adresu IP
 app.put('/api/ip-addresses/:id', requireAuth, (req, res) => {
   const { id } = req.params;
   const { ip_address, subnet_id, company_name, assigned_date, is_occupied, description } = req.body;
   
-  // Получаем старые значения
+  // Pobieramy stare wartości
   db.get("SELECT * FROM ip_addresses WHERE id = ?", [id], (err, oldIp) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -400,18 +400,18 @@ app.put('/api/ip-addresses/:id', requireAuth, (req, res) => {
         
         const newIp = { id, ip_address, subnet_id, company_name, assigned_date, is_occupied, description };
         logAudit(req, 'UPDATE_IP', 'ip_address', id, oldIp, newIp);
-        res.json({ message: 'IP адрес обновлен' });
+        res.json({ message: 'Adres IP został zaktualizowany' });
       });
   });
 });
 
-// Массовое удаление IP адресов
+// Masowe usuwanie adresów IP
 app.delete('/api/ip-addresses/bulk', requireAuth, (req, res) => {
-  console.log('=== МАССОВОЕ УДАЛЕНИЕ IP АДРЕСОВ ===');
-  console.log('Получен запрос body:', req.body);
+  console.log('=== MASOWE USUWANIE ADRESÓW IP ===');
+  console.log('Otrzymano żądanie body:', req.body);
   const { start_ip, end_ip, subnet_id } = req.body;
   
-  // Функция для преобразования IP в число
+  // Funkcja do przekształcenia IP na liczbę
   function ipToNumber(ip) {
     return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
   }
@@ -421,24 +421,24 @@ app.delete('/api/ip-addresses/bulk', requireAuth, (req, res) => {
     const endNum = ipToNumber(end_ip);
     
     if (startNum > endNum) {
-      res.status(400).json({ error: 'Начальный IP должен быть меньше конечного IP' });
+      res.status(400).json({ error: 'Początkowy IP musi być mniejszy od końcowego IP' });
       return;
     }
     
     const totalIps = endNum - startNum + 1;
     if (totalIps > 1000) {
-      res.status(400).json({ error: 'Максимальное количество IP адресов для массового удаления: 1000' });
+      res.status(400).json({ error: 'Maksymalna liczba adresów IP do masowego usuwania: 1000' });
       return;
     }
     
-    // Создаем массив IP адресов в диапазоне
+    // Tworzymy tablicę adresów IP w zakresie
     const ipList = [];
     for (let i = startNum; i <= endNum; i++) {
       const ip = [(i >>> 24) & 255, (i >>> 16) & 255, (i >>> 8) & 255, i & 255].join('.');
       ipList.push(ip);
     }
     
-    // Формируем запрос для поиска IP адресов в диапазоне
+    // Tworzymy zapytanie do wyszukiwania adresów IP w zakresie
     let query = `SELECT * FROM ip_addresses WHERE ip_address IN (${ipList.map(() => '?').join(',')})`;
     let params = [...ipList];
     
@@ -447,7 +447,7 @@ app.delete('/api/ip-addresses/bulk', requireAuth, (req, res) => {
       params.push(subnet_id);
     }
     
-    // Сначала получаем IP адреса для логирования
+    // Najpierw pobieramy adresy IP do logowania
     db.all(query, params, (err, ipsToDelete) => {
       if (err) {
         logAudit(req, 'BULK_DELETE_IP_FAILED', 'ip_address', null, null, { 
@@ -462,19 +462,19 @@ app.delete('/api/ip-addresses/bulk', requireAuth, (req, res) => {
       
       if (ipsToDelete.length === 0) {
         res.json({ 
-          message: 'Нет IP адресов для удаления в указанном диапазоне',
+          message: 'Brak adresów IP do usunięcia w podanym zakresie',
           deleted_count: 0,
           deleted_ips: []
         });
         return;
       }
       
-      // Теперь удаляем найденные IP адреса
+      // Teraz usuwamy znalezione adresy IP
       const existingIps = ipsToDelete.map(ip => ip.ip_address);
       
-      // Добавляем отладочную информацию
-      console.log(`Найдено IP для удаления: ${existingIps.length}`);
-      console.log('IP адреса:', existingIps);
+      // Dodajemy informacje debugowania
+      console.log(`Znaleziono IP do usunięcia: ${existingIps.length}`);
+      console.log('Adresy IP:', existingIps);
       
       let deleteQuery = `DELETE FROM ip_addresses WHERE ip_address IN (${existingIps.map(() => '?').join(',')})`;
       let deleteParams = [...existingIps];
@@ -489,7 +489,7 @@ app.delete('/api/ip-addresses/bulk', requireAuth, (req, res) => {
       
       db.run(deleteQuery, deleteParams, function(err) {
         if (err) {
-          console.error('Ошибка при удалении:', err);
+          console.error('Błąd podczas usuwania:', err);
           logAudit(req, 'BULK_DELETE_IP_FAILED', 'ip_address', null, null, { 
             start_ip, 
             end_ip, 
@@ -501,11 +501,11 @@ app.delete('/api/ip-addresses/bulk', requireAuth, (req, res) => {
         }
         
         const deletedCount = this.changes;
-        console.log(`Фактически удалено записей: ${deletedCount}`);
+        console.log(`Faktycznie usunięto rekordów: ${deletedCount}`);
         
         const deletedIps = ipsToDelete.map(ip => ip.ip_address);
         
-        // Логируем массовое удаление
+        // Logujemy masowe usuwanie
         const bulkDeleteData = { 
           start_ip, 
           end_ip, 
@@ -516,7 +516,7 @@ app.delete('/api/ip-addresses/bulk', requireAuth, (req, res) => {
         logAudit(req, 'BULK_DELETE_IP', 'ip_address', null, ipsToDelete, bulkDeleteData);
         
         res.json({ 
-          message: `Удалено ${deletedCount} IP адресов из диапазона ${start_ip} - ${end_ip}`,
+          message: `Usunięto ${deletedCount} adresów IP z zakresu ${start_ip} - ${end_ip}`,
           deleted_count: deletedCount,
           deleted_ips: deletedIps
         });
@@ -530,15 +530,15 @@ app.delete('/api/ip-addresses/bulk', requireAuth, (req, res) => {
       subnet_id,
       error: error.message 
     });
-    res.status(500).json({ error: 'Ошибка при массовом удалении IP адресов: ' + error.message });
+    res.status(500).json({ error: 'Błąd podczas masowego usuwania adresów IP: ' + error.message });
   }
 });
 
-// Удалить IP адрес
+// Usunięcie adresu IP
 app.delete('/api/ip-addresses/:id', requireAuth, (req, res) => {
   const { id } = req.params;
   
-  // Получаем данные перед удалением
+  // Pobieramy dane przed usunięciem
   db.get("SELECT * FROM ip_addresses WHERE id = ?", [id], (err, ip) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -553,30 +553,30 @@ app.delete('/api/ip-addresses/:id', requireAuth, (req, res) => {
       }
       
       logAudit(req, 'DELETE_IP', 'ip_address', id, ip, null);
-      res.json({ message: 'IP адрес удален' });
+      res.json({ message: 'Adres IP został usunięty' });
     });
   });
 });
 
-// Удалить подсеть
+// Usunięcie podsieci
 app.delete('/api/subnets/:id', requireAuth, (req, res) => {
   const { id } = req.params;
   
-  // Получаем данные подсети перед удалением
+  // Pobieramy dane podsieci przed usunięciem
   db.get("SELECT * FROM subnets WHERE id = ?", [id], (err, subnet) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
     
-    // Сначала отвязываем IP адреса от этой подсети
+    // Najpierw odłączamy adresy IP od tej podsieci
     db.run("UPDATE ip_addresses SET subnet_id = NULL WHERE subnet_id = ?", [id], function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
         return;
       }
       
-      // Затем удаляем саму подсеть
+      // Następnie usuwamy samą podsieć
       db.run("DELETE FROM subnets WHERE id = ?", [id], function(err) {
         if (err) {
           logAudit(req, 'DELETE_SUBNET_FAILED', 'subnet', id, subnet, { error: err.message });
@@ -585,22 +585,22 @@ app.delete('/api/subnets/:id', requireAuth, (req, res) => {
         }
         
         logAudit(req, 'DELETE_SUBNET', 'subnet', id, subnet, null);
-        res.json({ message: 'Подсеть удалена' });
+        res.json({ message: 'Podsieć została usunięta' });
       });
     });
   });
 });
 
-// Массовое добавление IP адресов
+// Masowe dodawanie adresów IP
 app.post('/api/ip-addresses/bulk', requireAuth, (req, res) => {
   const { subnet_id, start_ip, end_ip, company_name, assigned_date, is_occupied, description } = req.body;
   
-  // Функция для преобразования IP в число
+  // Funkcja do przekształcenia IP na liczbę
   function ipToNumber(ip) {
     return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
   }
   
-  // Функция для преобразования числа в IP
+  // Funkcja do przekształcenia liczby na IP
   function numberToIp(num) {
     return [(num >>> 24) & 255, (num >>> 16) & 255, (num >>> 8) & 255, num & 255].join('.');
   }
@@ -610,13 +610,13 @@ app.post('/api/ip-addresses/bulk', requireAuth, (req, res) => {
     const endNum = ipToNumber(end_ip);
     
     if (startNum > endNum) {
-      res.status(400).json({ error: 'Начальный IP должен быть меньше конечного IP' });
+      res.status(400).json({ error: 'Początkowy IP musi być mniejszy od końcowego IP' });
       return;
     }
     
     const totalIps = endNum - startNum + 1;
     if (totalIps > 1000) {
-      res.status(400).json({ error: 'Максимальное количество IP адресов для массового создания: 1000' });
+      res.status(400).json({ error: 'Maksymalna liczba adresów IP do masowego tworzenia: 1000' });
       return;
     }
     
@@ -642,12 +642,12 @@ app.post('/api/ip-addresses/bulk', requireAuth, (req, res) => {
     
     stmt.finalize();
     
-    // Логируем массовое создание IP
+    // Logujemy masowe tworzenie IP
     const bulkData = { start_ip, end_ip, subnet_id, company_name, assigned_date, is_occupied, description, created_count: createdCount };
     logAudit(req, 'BULK_CREATE_IP', 'ip_address', null, null, bulkData);
     
     res.json({ 
-      message: `Создано ${createdCount} IP адресов из ${totalIps}`,
+      message: `Utworzono ${createdCount} adresów IP z ${totalIps}`,
       created_count: createdCount,
       total_requested: totalIps,
       errors: errors
@@ -655,11 +655,11 @@ app.post('/api/ip-addresses/bulk', requireAuth, (req, res) => {
     
   } catch (error) {
     logAudit(req, 'BULK_CREATE_IP_FAILED', 'ip_address', null, null, { start_ip, end_ip, error: error.message });
-    res.status(500).json({ error: 'Ошибка при массовом создании IP адресов: ' + error.message });
+    res.status(500).json({ error: 'Błąd podczas masowego tworzenia adresów IP: ' + error.message });
   }
 });
 
-// Импорт из Excel
+// Import z Excel
 app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res) => {
   try {
     const workbook = XLSX.readFile(req.file.path);
@@ -680,7 +680,7 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
           [ip_address, company_name || '', assigned_date || null, is_occupied || 0, description || ''],
           function(err) {
             if (err) {
-              errors.push(`Строка ${index + 1}: ${err.message}`);
+              errors.push(`Wiersz ${index + 1}: ${err.message}`);
             } else if (this.changes > 0) {
               imported++;
             }
@@ -689,7 +689,7 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
     });
 
     setTimeout(() => {
-      // Логируем импорт
+      // Logujemy import
       logAudit(req, 'IMPORT_EXCEL', 'ip_address', null, null, { 
         filename: req.file.originalname, 
         imported_count: imported, 
@@ -698,18 +698,18 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
       });
       
       res.json({ 
-        message: `Импортировано ${imported} записей`, 
+        message: `Zaimportowano ${imported} rekordów`, 
         errors: errors 
       });
     }, 1000);
 
   } catch (error) {
     logAudit(req, 'IMPORT_EXCEL_FAILED', 'ip_address', null, null, { error: error.message });
-    res.status(500).json({ error: 'Ошибка при обработке файла Excel' });
+    res.status(500).json({ error: 'Błąd podczas przetwarzania pliku Excel' });
   }
 });
 
-// Получить логи аудита
+// Pobranie logów audytu
 app.get('/api/audit-logs', requireAuth, (req, res) => {
   const { page = 1, limit = 50, action, entity_type, username } = req.query;
   const offset = (page - 1) * limit;
@@ -739,14 +739,14 @@ app.get('/api/audit-logs', requireAuth, (req, res) => {
   query += ` ORDER BY created_date DESC LIMIT ? OFFSET ?`;
   params.push(parseInt(limit), parseInt(offset));
   
-  // Получаем общее количество записей
+  // Pobieramy całkowitą liczbę rekordów
   db.get(countQuery, params.slice(0, -2), (err, countResult) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
     
-    // Получаем записи для текущей страницы
+    // Pobieramy rekordy dla bieżącej strony
     db.all(query, params, (err, rows) => {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -764,7 +764,7 @@ app.get('/api/audit-logs', requireAuth, (req, res) => {
   });
 });
 
-// Получить детали конкретного лога
+// Pobranie szczegółów konkretnego loga
 app.get('/api/audit-logs/:id', requireAuth, (req, res) => {
   const { id } = req.params;
   
@@ -775,7 +775,7 @@ app.get('/api/audit-logs/:id', requireAuth, (req, res) => {
     }
     
     if (!log) {
-      res.status(404).json({ error: 'Лог не найден' });
+      res.status(404).json({ error: 'Log nie został znaleziony' });
       return;
     }
     
@@ -783,7 +783,7 @@ app.get('/api/audit-logs/:id', requireAuth, (req, res) => {
   });
 });
 
-// Статистика
+// Statystyki
 app.get('/api/stats', requireAuth, (req, res) => {
   db.all(`SELECT 
     COUNT(*) as total_ips,

@@ -1,6 +1,6 @@
 const os = require('os');
 
-console.log('🌐 Информация о сетевых интерфейсах:\n');
+console.log('🌐 Informacje o interfejsach sieciowych:\n');
 
 const networkInterfaces = os.networkInterfaces();
 const port = process.env.PORT || 3000;
@@ -10,21 +10,21 @@ Object.keys(networkInterfaces).forEach(interfaceName => {
   
   networkInterfaces[interfaceName].forEach(interface => {
     if (interface.family === 'IPv4') {
-      const type = interface.internal ? '(Локальный)' : '(Сетевой)';
+      const type = interface.internal ? '(Lokalny)' : '(Sieciowy)';
       const url = `http://${interface.address}:${port}`;
       
       console.log(`   IPv4: ${interface.address} ${type}`);
       console.log(`   URL:  ${url}`);
       
       if (!interface.internal) {
-        console.log(`   🔗 Доступен в локальной сети`);
+        console.log(`   🔗 Dostępny w sieci lokalnej`);
       }
     }
   });
   console.log('');
 });
 
-console.log('💡 Для запуска сервера в сети используйте:');
+console.log('💡 Aby uruchomić serwer w sieci użyj:');
 console.log('   npm run network');
-console.log('   или');
+console.log('   lub');
 console.log('   npm run network:dev');

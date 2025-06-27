@@ -1,15 +1,15 @@
 module.exports = {
-  // Настройки сервера
+  // Ustawienia serwera
   server: {
-    host: process.env.HOST || '0.0.0.0', // 0.0.0.0 для доступа из сети
+    host: process.env.HOST || '0.0.0.0', // 0.0.0.0 dla dostępu z sieci
     port: process.env.PORT || 3000,
     environment: process.env.NODE_ENV || 'development'
   },
   
-  // Настройки CORS для локальной сети
+  // Ustawienia CORS dla sieci lokalnej
   cors: {
     origin: function(origin, callback) {
-      // Разрешаем запросы с любых IP в локальной сети
+      // Zezwalamy na żądania z dowolnych IP w sieci lokalnej
       const allowedPatterns = [
         /^http:\/\/localhost:\d+$/,
         /^http:\/\/127\.0\.0\.1:\d+$/,
@@ -18,7 +18,7 @@ module.exports = {
         /^http:\/\/172\.(1[6-9]|2\d|3[01])\.\d+\.\d+:\d+$/
       ];
       
-      // Разрешаем запросы без origin (например, мобильные приложения)
+      // Zezwalamy na żądania bez origin (np. aplikacje mobilne)
       if (!origin) return callback(null, true);
       
       const isAllowed = allowedPatterns.some(pattern => pattern.test(origin));
@@ -28,7 +28,7 @@ module.exports = {
     optionsSuccessStatus: 200
   },
   
-  // Настройки сессий для работы в сети
+  // Ustawienia sesji dla pracy w sieci
   session: {
     secret: process.env.SESSION_SECRET || 'ip-management-secret-key-2024',
     resave: false,
@@ -36,17 +36,17 @@ module.exports = {
     cookie: {
       secure: process.env.NODE_ENV === 'production' && process.env.HTTPS === 'true',
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 часа
-      sameSite: 'lax' // Для работы в локальной сети
+      maxAge: 24 * 60 * 60 * 1000, // 24 godziny
+      sameSite: 'lax' // Do pracy w sieci lokalnej
     }
   },
   
-  // Настройки безопасности для локальной сети
+  // Ustawienia bezpieczeństwa dla sieci lokalnej
   security: {
     trustProxy: process.env.NODE_ENV === 'production',
     rateLimit: {
-      windowMs: 15 * 60 * 1000, // 15 минут
-      max: process.env.NODE_ENV === 'production' ? 100 : 1000 // ограничений
+      windowMs: 15 * 60 * 1000, // 15 minut
+      max: process.env.NODE_ENV === 'production' ? 100 : 1000 // ograniczenia
     }
   }
 };

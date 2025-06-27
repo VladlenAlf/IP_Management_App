@@ -1,4 +1,4 @@
-/* Базовые стили */
+/* Style podstawowe */
 * {
     margin: 0;
     padding: 0;
@@ -18,7 +18,7 @@ body {
     padding: 20px;
 }
 
-/* Заголовок */
+/* Nagłówek */
 header {
     background: white;
     border-radius: 10px;
@@ -51,7 +51,7 @@ header {
     font-weight: 500;
 }
 
-/* Статистика */
+/* Statystyki */
 .stats {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -89,7 +89,7 @@ header {
     letter-spacing: 1px;
 }
 
-/* Табы */
+/* Zakładki */
 .tabs {
     display: flex;
     background: white;
@@ -120,7 +120,7 @@ header {
     color: white;
 }
 
-/* Контент табов */
+/* Zawartość zakładek */
 .tab-content {
     display: none;
     background: white;
@@ -133,7 +133,7 @@ header {
     display: block;
 }
 
-/* Панель инструментов */
+/* Panel narzędzi */
 .toolbar {
     display: flex;
     justify-content: space-between;
@@ -149,7 +149,7 @@ header {
     flex-wrap: wrap;
 }
 
-/* Кнопки */
+/* Przyciski */
 .btn {
     padding: 10px 20px;
     border: none;
@@ -203,7 +203,7 @@ header {
     font-size: 12px;
 }
 
-/* Таблицы */
+/* Tabele */
 .table-container {
     overflow-x: auto;
 }
@@ -236,7 +236,7 @@ tr:hover {
     background: #f8f9fa;
 }
 
-/* Статус бейджи */
+/* Znaczniki statusu */
 .status-badge {
     padding: 4px 12px;
     border-radius: 20px;
@@ -255,7 +255,7 @@ tr:hover {
     color: #27ae60;
 }
 
-/* Формы */
+/* Formularze */
 .form-group {
     margin-bottom: 20px;
 }
@@ -294,7 +294,7 @@ textarea {
     border-top: 1px solid #e1e5e9;
 }
 
-/* Модальные окна */
+/* Okna modalne */
 .modal {
     display: none;
     position: fixed;
@@ -332,7 +332,7 @@ textarea {
     color: #000;
 }
 
-/* Сообщения */
+/* Komunikaty */
 .message {
     padding: 15px 20px;
     margin: 10px 0;
@@ -358,13 +358,13 @@ textarea {
     border-left: 4px solid #e74c3c;
 }
 
-/* Стили для чекбокса подтверждения */
+/* Style dla checkboxa potwierdzenia */
 .form-group input[type="checkbox"] {
     width: auto;
     margin-right: 8px;
 }
 
-/* Импорт/экспорт */
+/* Import/eksport */
 .import-section {
     max-width: 600px;
 }
@@ -388,7 +388,7 @@ textarea {
     margin: 0;
 }
 
-/* Стили для логов аудита */
+/* Style dla logów audytu */
 .action-badge {
     padding: 4px 8px;
     border-radius: 4px;
@@ -433,7 +433,7 @@ textarea {
     white-space: nowrap;
 }
 
-/* Стили для модального окна деталей лога */
+/* Style dla okna modalnego szczegółów loga */
 .log-detail-section {
     margin-bottom: 25px;
     padding: 15px;
@@ -491,7 +491,7 @@ textarea {
     word-wrap: break-word;
 }
 
-/* Стили для аналитики */
+/* Style dla analityki */
 .analytics-filters {
     display: flex;
     gap: 10px;
@@ -566,7 +566,7 @@ textarea {
     color: #27ae60;
 }
 
-/* Специальные стили для модального окна массового удаления */
+/* Specjalne style dla okna modalnego masowego usuwania */
 .bulk-delete-warning {
     background: #fff3cd;
     border: 1px solid #ffeaa7;
@@ -585,7 +585,7 @@ textarea {
     color: #856404;
 }
 
-/* Адаптивность */
+/* Responsywność */
 @media (max-width: 768px) {
     .container {
         padding: 10px;
