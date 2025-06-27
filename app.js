@@ -112,6 +112,19 @@ const API = {
         return response.json();
     },
 
+    async deleteBulkIpAddresses(bulkData) {
+        console.log('API: отправляем DELETE запрос с данными:', bulkData);
+        const response = await fetch('/api/ip-addresses/bulk', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(bulkData)
+        });
+        console.log('API: получен response status:', response.status);
+        const result = await response.json();
+        console.log('API: получен результат:', result);
+        return result;
+    },
+
     async fetchAuditLogs(page = 1, filters = {}) {
         const params = new URLSearchParams();
         params.append('page', page);
@@ -736,7 +749,7 @@ function setupEventListeners() {
                 loadIpAddresses();
                 loadStats();
             } catch (error) {
-                showMessage('Błąd podczas zapisywania adresu IP', 'error');
+                showMessage('Błąd podczas записывания адреса IP', 'error');
             }
         });
     }
@@ -767,7 +780,7 @@ function setupEventListeners() {
                 loadSubnets();
                 loadStats();
             } catch (error) {
-                showMessage('Błąd podczas zapisyвания podsieci', 'error');
+                showMessage('Błąd podczas записывания подсети', 'error');
             }
         });
     }
@@ -799,7 +812,7 @@ function setupEventListeners() {
                     loadStats();
                 }
             } catch (error) {
-                showMessage('Błąd podczas masowego tworzenia adresów IP', 'error');
+                showMessage('Błąd podczas масового tworения адресов IP', 'error');
             }
         });
     }
@@ -837,8 +850,11 @@ function setupEventListeners() {
                 subnet_id: subnetId || null
             };
             
+            console.log('Отправляем запрос на массовое удаление:', bulkDeleteData);
+            
             try {
                 const result = await API.deleteBulkIpAddresses(bulkDeleteData);
+                console.log('Получен ответ от сервера:', result);
                 
                 if (result.error) {
                     showMessage(result.error, 'error');
@@ -856,7 +872,7 @@ function setupEventListeners() {
                 }
             } catch (error) {
                 console.error('Błąd:', error);
-                showMessage('Błąd podczas masowego usuwania adresów IP', 'error');
+                showMessage('Błąd podczas масового usувания адресов IP', 'error');
             }
         });
     }
@@ -1038,8 +1054,8 @@ function renderLogsTable(logs) {
             'LOGIN_FAILED': 'Nieudane logowanie',
             'LOGOUT': 'Wylogowanie z systemu',
             'CREATE_SUBNET': 'Tworzenie podsieci',
-            'UPDATE_SUBNET': 'Modyfikacja podsieci',
-            'DELETE_SUBNET': 'Usuwanie podsieci',
+            'UPDATE_SUBNET': 'Modyfikacja подсети',
+            'DELETE_SUBNET': 'Usuwanie подсети',
             'CREATE_IP': 'Tworzenie IP',
             'UPDATE_IP': 'Modyfikacja IP',
             'DELETE_IP': 'Usuwanie IP',
@@ -1157,8 +1173,8 @@ async function showLogDetails(logId) {
             'LOGIN_FAILED': 'Nieudane logowanie',
             'LOGOUT': 'Wylogowanie z systemu',
             'CREATE_SUBNET': 'Tworzenie podsieci',
-            'UPDATE_SUBNET': 'Modyfikacja podsieci',
-            'DELETE_SUBNET': 'Usuwanie podsieci',
+            'UPDATE_SUBNET': 'Modyfikacja подсети',
+            'DELETE_SUBNET': 'Usuwanie подсети',
             'CREATE_IP': 'Tworzenie IP',
             'UPDATE_IP': 'Modyfikacja IP',
             'DELETE_IP': 'Usuwanie IP',
@@ -1255,13 +1271,13 @@ async function deleteIp(id) {
         loadIpAddresses();
         loadStats();
     } catch (error) {
-        showMessage('Błąd podczas usuwania adresu IP', 'error');
+        showMessage('Błąd podczas usuwания адреса IP', 'error');
     }
 }
 
 // Удаление подсети
 async function deleteSubnet(id) {
-    if (!confirm('Czy na pewno chcesz usunąć tę podsieć? Wszystkie powiązane adresy IP zostaną odłączone od niej.')) return;
+    if (!confirm('Czy na pewno chcesz usunąć tę podsieć? Wszystkie powiązane адресы IP zostaną отłączены от нее.')) return;
     
     try {
         await API.deleteSubnet(id);
@@ -1270,7 +1286,7 @@ async function deleteSubnet(id) {
         loadIpAddresses(); // Обновляем список IP адресов
         loadStats();
     } catch (error) {
-        showMessage('Błąd podczas usuwania podsieci', 'error');
+        showMessage('Błąд podczas usuwания подсети', 'error');
     }
 }
 

@@ -383,6 +383,135 @@ app.put('/api/ip-addresses/:id', requireAuth, (req, res) => {
   });
 });
 
+// Массовое удаление IP адресов
+app.delete('/api/ip-addresses/bulk', requireAuth, (req, res) => {
+  console.log('=== МАССОВОЕ УДАЛЕНИЕ IP АДРЕСОВ ===');
+  console.log('Получен запрос body:', req.body);
+  const { start_ip, end_ip, subnet_id } = req.body;
+  
+  // Функция для преобразования IP в число
+  function ipToNumber(ip) {
+    return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
+  }
+  
+  try {
+    const startNum = ipToNumber(start_ip);
+    const endNum = ipToNumber(end_ip);
+    
+    if (startNum > endNum) {
+      res.status(400).json({ error: 'Начальный IP должен быть меньше конечного IP' });
+      return;
+    }
+    
+    const totalIps = endNum - startNum + 1;
+    if (totalIps > 1000) {
+      res.status(400).json({ error: 'Максимальное количество IP адресов для массового удаления: 1000' });
+      return;
+    }
+    
+    // Создаем массив IP адресов в диапазоне
+    const ipList = [];
+    for (let i = startNum; i <= endNum; i++) {
+      const ip = [(i >>> 24) & 255, (i >>> 16) & 255, (i >>> 8) & 255, i & 255].join('.');
+      ipList.push(ip);
+    }
+    
+    // Формируем запрос для поиска IP адресов в диапазоне
+    let query = `SELECT * FROM ip_addresses WHERE ip_address IN (${ipList.map(() => '?').join(',')})`;
+    let params = [...ipList];
+    
+    if (subnet_id) {
+      query += ` AND subnet_id = ?`;
+      params.push(subnet_id);
+    }
+    
+    // Сначала получаем IP адреса для логирования
+    db.all(query, params, (err, ipsToDelete) => {
+      if (err) {
+        logAudit(req, 'BULK_DELETE_IP_FAILED', 'ip_address', null, null, { 
+          start_ip, 
+          end_ip, 
+          subnet_id,
+          error: err.message 
+        });
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      
+      if (ipsToDelete.length === 0) {
+        res.json({ 
+          message: 'Нет IP адресов для удаления в указанном диапазоне',
+          deleted_count: 0,
+          deleted_ips: []
+        });
+        return;
+      }
+      
+      // Теперь удаляем найденные IP адреса
+      const existingIps = ipsToDelete.map(ip => ip.ip_address);
+      
+      // Добавляем отладочную информацию
+      console.log(`Найдено IP для удаления: ${existingIps.length}`);
+      console.log('IP адреса:', existingIps);
+      
+      let deleteQuery = `DELETE FROM ip_addresses WHERE ip_address IN (${existingIps.map(() => '?').join(',')})`;
+      let deleteParams = [...existingIps];
+      
+      if (subnet_id) {
+        deleteQuery += ` AND subnet_id = ?`;
+        deleteParams.push(subnet_id);
+      }
+      
+      console.log('Delete query:', deleteQuery);
+      console.log('Delete params:', deleteParams);
+      
+      db.run(deleteQuery, deleteParams, function(err) {
+        if (err) {
+          console.error('Ошибка при удалении:', err);
+          logAudit(req, 'BULK_DELETE_IP_FAILED', 'ip_address', null, null, { 
+            start_ip, 
+            end_ip, 
+            subnet_id,
+            error: err.message 
+          });
+          res.status(500).json({ error: err.message });
+          return;
+        }
+        
+        const deletedCount = this.changes;
+        console.log(`Фактически удалено записей: ${deletedCount}`);
+        
+        const deletedIps = ipsToDelete.map(ip => ip.ip_address);
+        
+        // Логируем массовое удаление
+        const bulkDeleteData = { 
+          start_ip, 
+          end_ip, 
+          subnet_id, 
+          deleted_count: deletedCount,
+          deleted_ips: deletedIps
+        };
+        logAudit(req, 'BULK_DELETE_IP', 'ip_address', null, ipsToDelete, bulkDeleteData);
+        
+        res.json({ 
+          message: `Удалено ${deletedCount} IP адресов из диапазона ${start_ip} - ${end_ip}`,
+          deleted_count: deletedCount,
+          deleted_ips: deletedIps
+        });
+      });
+    });
+    
+  } catch (error) {
+    logAudit(req, 'BULK_DELETE_IP_FAILED', 'ip_address', null, null, { 
+      start_ip, 
+      end_ip, 
+      subnet_id,
+      error: error.message 
+    });
+    res.status(500).json({ error: 'Ошибка при массовом удалении IP адресов: ' + error.message });
+  }
+});
+
 // Удалить IP адрес
 app.delete('/api/ip-addresses/:id', requireAuth, (req, res) => {
   const { id } = req.params;
@@ -881,117 +1010,3 @@ app.listen(PORT, HOST, () => {
   console.log('✅ Готов к работе!\n');
 });
 
-// Массовое удаление IP адресов
-app.delete('/api/ip-addresses/bulk', requireAuth, (req, res) => {
-  const { start_ip, end_ip, subnet_id } = req.body;
-  
-  // Функция для преобразования IP в число
-  function ipToNumber(ip) {
-    return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
-  }
-  
-  try {
-    const startNum = ipToNumber(start_ip);
-    const endNum = ipToNumber(end_ip);
-    
-    if (startNum > endNum) {
-      res.status(400).json({ error: 'Начальный IP должен быть меньше конечного IP' });
-      return;
-    }
-    
-    const totalIps = endNum - startNum + 1;
-    if (totalIps > 1000) {
-      res.status(400).json({ error: 'Максимальное количество IP адресов для массового удаления: 1000' });
-      return;
-    }
-    
-    // Создаем массив IP адресов в диапазоне
-    const ipList = [];
-    for (let i = startNum; i <= endNum; i++) {
-      const ip = [(i >>> 24) & 255, (i >>> 16) & 255, (i >>> 8) & 255, i & 255].join('.');
-      ipList.push(ip);
-    }
-    
-    // Формируем запрос для поиска IP адресов в диапазоне
-    let query = `SELECT * FROM ip_addresses WHERE ip_address IN (${ipList.map(() => '?').join(',')})`;
-    let params = [...ipList];
-    
-    if (subnet_id) {
-      query += ` AND subnet_id = ?`;
-      params.push(subnet_id);
-    }
-    
-    // Сначала получаем IP адреса для логирования
-    db.all(query, params, (err, ipsToDelete) => {
-      if (err) {
-        logAudit(req, 'BULK_DELETE_IP_FAILED', 'ip_address', null, null, { 
-          start_ip, 
-          end_ip, 
-          subnet_id,
-          error: err.message 
-        });
-        res.status(500).json({ error: err.message });
-        return;
-      }
-      
-      if (ipsToDelete.length === 0) {
-        res.json({ 
-          message: 'Нет IP адресов для удаления в указанном диапазоне',
-          deleted_count: 0,
-          deleted_ips: []
-        });
-        return;
-      }
-      
-      // Теперь удаляем найденные IP адреса
-      let deleteQuery = `DELETE FROM ip_addresses WHERE ip_address IN (${ipList.map(() => '?').join(',')})`;
-      let deleteParams = [...ipList];
-      
-      if (subnet_id) {
-        deleteQuery += ` AND subnet_id = ?`;
-        deleteParams.push(subnet_id);
-      }
-      
-      db.run(deleteQuery, deleteParams, function(err) {
-        if (err) {
-          logAudit(req, 'BULK_DELETE_IP_FAILED', 'ip_address', null, null, { 
-            start_ip, 
-            end_ip, 
-            subnet_id,
-            error: err.message 
-          });
-          res.status(500).json({ error: err.message });
-          return;
-        }
-        
-        const deletedCount = this.changes;
-        const deletedIps = ipsToDelete.map(ip => ip.ip_address);
-        
-        // Логируем массовое удаление
-        const bulkDeleteData = { 
-          start_ip, 
-          end_ip, 
-          subnet_id, 
-          deleted_count: deletedCount,
-          deleted_ips: deletedIps
-        };
-        logAudit(req, 'BULK_DELETE_IP', 'ip_address', null, ipsToDelete, bulkDeleteData);
-        
-        res.json({ 
-          message: `Удалено ${deletedCount} IP адресов из диапазона ${start_ip} - ${end_ip}`,
-          deleted_count: deletedCount,
-          deleted_ips: deletedIps
-        });
-      });
-    });
-    
-  } catch (error) {
-    logAudit(req, 'BULK_DELETE_IP_FAILED', 'ip_address', null, null, { 
-      start_ip, 
-      end_ip, 
-      subnet_id,
-      error: error.message 
-    });
-    res.status(500).json({ error: 'Ошибка при массовом удалении IP адресов: ' + error.message });
-  }
-});
