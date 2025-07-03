@@ -207,9 +207,10 @@ async function checkAuthAndInit() {
         currentUser = authStatus.user;
         updateUserInfo();
         
-        loadStats();
-        loadSubnets();
-        loadCompanies();
+        // Сначала загружаем компании, затем подсети и статистику
+        await loadCompanies();
+        await loadSubnets();
+        await loadStats();
         setupEventListeners();
     } catch (error) {
         console.error('Ошибка проверки авторизации:', error);
@@ -275,6 +276,11 @@ async function loadCompanies() {
         companies = await API.fetchCompanies();
         updateCompanyOptions();
         renderCompaniesTable(); // Добавлено для отображения таблицы компаний
+        
+        // Обновляем аналитику после загрузки компаний
+        if (document.querySelector('.tab-content.active')?.id === 'analytics') {
+            await updateAnalytics();
+        }
     } catch (error) {
         console.error('Ошибка загрузки компаний:', error);
     }
@@ -595,7 +601,7 @@ function editSubnet(id) {
 
 // Обновление опций компаний
 function updateCompanyOptions() {
-    const selects = ['subnetCompany', 'companyFilter'];
+    const selects = ['subnetCompany', 'companyFilter', 'analyticsCompanyFilter'];
     
     selects.forEach(selectId => {
         const select = document.getElementById(selectId);
@@ -605,6 +611,8 @@ function updateCompanyOptions() {
         
         if (selectId === 'companyFilter') {
             select.innerHTML = '<option value="">Wszystkie firmy</option><option value="free">Wolne</option>';
+        } else if (selectId === 'analyticsCompanyFilter') {
+            select.innerHTML = '<option value="">Wszystkie firmy</option>';
         } else {
             select.innerHTML = '<option value="">Wolna (nieprzypisana)</option>';
         }
@@ -952,34 +960,6 @@ async function importCompaniesExcel() {
 }
 
 // Экспорт фирм в Excel
-async function exportCompaniesExcel() {
-    try {
-        const blob = await API.exportCompaniesExcel();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'firmy.xlsx';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-        
-        showMessage('Plik z firmami został pobrany', 'success');
-    } catch (error) {
-        console.error('Błąd экспорта фирм:', error);
-        showMessage('Błąd podczas экспорта фирм', 'error');
-    }
-}
-
-function handleCompaniesFileSelect() {
-    const fileInput = document.getElementById('companiesExcelFile');
-    const file = fileInput.files[0];
-    
-    if (file) {
-        console.log('Wybrany plik фирм:', file.name);
-    }
-}
-
 // Показ сообщений
 function showMessage(text, type) {
     const messageDiv = document.createElement('div');
@@ -1111,7 +1091,7 @@ function renderCompaniesTable() {
         // Подсчитываем количество подсетей для каждой компании
         let subnetCount;
         if (company.name === 'Wolne') {
-            // Для компании "Wolne" считаем подсети с company_id = NULL (неназначенные)
+            // Для компании "Wolне" считаем подсети с company_id = NULL (неназначенные)
             subnetCount = subnets.filter(subnet => 
                 subnet.company_id === null
             ).length;
@@ -1155,7 +1135,7 @@ function renderLogsTable(logs) {
             'CREATE_SUBNET': 'Tworzenie podsieci',
             'UPDATE_SUBNET': 'Модификация подсети',
             'DELETE_SUBNET': 'Usuwanie подсети',
-            'DIVIDE_SUBNET': 'Podział podsieci',
+            'DIVIDE_SUBNET': 'Podział подсети',
             'MERGE_SUBNETS': 'Łączenie подсетей',
             'ASSIGN_SUBNETS': 'Przypisanie подсетей',
             'CREATE_COMPANY': 'Tworzenie firmy',
@@ -1493,4 +1473,30 @@ function editCompany(id) {
     document.getElementById('companyDescription').value = company.description || '';
     
     document.getElementById('companyModal').style.display = 'block';
+}
+
+// Eksport do Excel
+async function exportExcel() {
+    try {
+        const response = await API.exportExcel();
+        
+        if (!response.ok) {
+            throw new Error('Błąd pobierania pliku');
+        }
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `export_${new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        showMessage('Plik został pobrany pomyślnie', 'success');
+    } catch (error) {
+        console.error('Błąд экспорта:', error);
+        showMessage('Błąd podczas eksportu danych', 'error');
+    }
 }

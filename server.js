@@ -993,9 +993,9 @@ app.get('/api/export-excel', requireAuth, (req, res) => {
       
       const workbook = XLSX.utils.book_new();
       const worksheet = XLSX.utils.json_to_sheet(exportData);
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Podsieci');
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Dane');
       
-      const fileName = `podsieci_${new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')}.xlsx`;
+      const fileName = `export_${new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')}.xlsx`;
       const filePath = path.join(__dirname, 'uploads', fileName);
       
       XLSX.writeFile(workbook, filePath);
@@ -1297,34 +1297,6 @@ app.get('/api/analytics/utilization', requireAuth, (req, res) => {
 
 // Import firm z Excel
 // Eksport firm do Excel
-app.get('/api/export-companies-excel', requireAuth, (req, res) => {
-  const query = `
-    SELECT name, description, created_date
-    FROM companies 
-    WHERE name != 'Wolne'
-    ORDER BY name
-  `;
-  
-  db.all(query, (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Firmy');
-    
-    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-    
-    res.setHeader('Content-Disposition', 'attachment; filename=firmy.xlsx');
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.send(buffer);
-    
-    logAudit(req, 'EXPORT_COMPANIES_EXCEL', 'company', null, null, { rows_count: rows.length });
-  });
-});
-
 // Функция для получения сетевых адресов
 function getNetworkAddresses() {
   const addresses = [];
