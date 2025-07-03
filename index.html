@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System Zarządzania Adresami IP</title>
+    <title>System Zarządzania Podsieciami</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -11,7 +11,7 @@
         <header>
             <div class="header-content">
                 <div class="header-left">
-                    <h1>System Zarządzania Adresami IP</h1>
+                    <h1>System Zarządzania Podsieciami</h1>
                 </div>
                 <div class="header-right">
                     <span class="user-info" id="userInfo">Ładowanie...</span>
@@ -20,64 +20,61 @@
             </div>
             <div class="stats" id="stats">
                 <div class="stat-item">
-                    <span class="stat-number" id="totalIps">0</span>
-                    <span class="stat-label">Łącznie IP</span>
+                    <span class="stat-number" id="totalSubnets">0</span>
+                    <span class="stat-label">Łącznie podsieci</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-number occupied" id="occupiedIps">0</span>
-                    <span class="stat-label">Zajęte</span>
+                    <span class="stat-number occupied" id="assignedSubnets">0</span>
+                    <span class="stat-label">Przypisane</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-number free" id="freeIps">0</span>
+                    <span class="stat-number free" id="freeSubnets">0</span>
                     <span class="stat-label">Wolne</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-number" id="totalSubnets">0</span>
-                    <span class="stat-label">Podsieci</span>
+                    <span class="stat-number" id="totalCompanies">0</span>
+                    <span class="stat-label">Firmy</span>
                 </div>
             </div>
         </header>
 
         <nav class="tabs">
-            <button class="tab-button active" onclick="showTab('ip-management')">Adresy IP</button>
-            <button class="tab-button" onclick="showTab('subnet-management')">Podsieci</button>
+            <button class="tab-button active" onclick="showTab('subnet-management')">Podsieci</button>
+            <button class="tab-button" onclick="showTab('company-management')">Firmy</button>
             <button class="tab-button" onclick="showTab('import-export')">Import/Eksport</button>
             <button class="tab-button" onclick="showTab('analytics')">Analityka</button>
             <button class="tab-button" onclick="showTab('audit-logs')">Logi systemu</button>
         </nav>
 
-        <!-- IP Management Tab -->
-        <div id="ip-management" class="tab-content active">
+        <!-- Subnet Management Tab -->
+        <div id="subnet-management" class="tab-content active">
             <div class="toolbar">
-                <button class="btn btn-primary" onclick="showAddIpModal()">Dodaj IP</button>
-                <button class="btn btn-success" onclick="showBulkIpModal()">Masowe dodawanie IP</button>
-                <button class="btn btn-danger" onclick="showBulkDeleteIpModal()">Masowe usuwanie IP</button>
+                <button class="btn btn-primary" onclick="showAddSubnetModal()">Dodaj podsieć</button>
+                <button class="btn btn-success" onclick="showDivideSubnetModal()">Podziel podsieć</button>
+                <button class="btn btn-success" onclick="showMergeSubnetsModal()">Połącz podsieci</button>
+                <button class="btn btn-danger" onclick="showAssignFreeSubnetsModal()">Przypisz wolne podsieci</button>
                 
                 <div class="filters">
-                    <select id="subnetFilter" onchange="filterIPs()">
-                        <option value="">Wszystkie podsieci</option>
+                    <select id="companyFilter" onchange="filterSubnets()">
+                        <option value="">Wszystkie firmy</option>
                     </select>
                     
-                    <select id="statusFilter" onchange="filterIPs()">
-                        <option value="">Wszystkie statusy</option>
-                        <option value="1">Zajęte</option>
-                        <option value="0">Wolne</option>
-                    </select>
-                    
-                    <input type="text" id="searchInput" placeholder="Szukaj..." onkeyup="filterIPs()">
+                    <input type="text" id="searchInput" placeholder="Szukaj..." onkeyup="filterSubnets()">
                 </div>
             </div>
 
             <div class="table-container">
-                <table id="ipTable">
+                <table id="subnetTable">
                     <thead>
                         <tr>
-                            <th>Adres IP</th>
-                            <th>Podsieć</th>
+                            <th><input type="checkbox" id="selectAllSubnets" onchange="toggleAllSubnets()"></th>
+                            <th>Sieć</th>
+                            <th>Maska</th>
+                            <th>Dostępne IP</th>
                             <th>Firma</th>
-                            <th>Data przydziału</th>
-                            <th>Status</th>
+                            <th>VLAN</th>
                             <th>Opis</th>
+                            <th>Utworzono</th>
                             <th>Akcje</th>
                         </tr>
                     </thead>
@@ -86,20 +83,19 @@
             </div>
         </div>
 
-        <!-- Subnet Management Tab -->
-        <div id="subnet-management" class="tab-content">
+        <!-- Company Management Tab -->
+        <div id="company-management" class="tab-content">
             <div class="toolbar">
-                <button class="btn btn-primary" onclick="showAddSubnetModal()">Dodaj podsieć</button>
+                <button class="btn btn-primary" onclick="showAddCompanyModal()">Dodaj firmę</button>
             </div>
 
             <div class="table-container">
-                <table id="subnetTable">
+                <table id="companyTable">
                     <thead>
                         <tr>
-                            <th>Sieć</th>
-                            <th>Maska</th>
-                            <th>Dostępne adresy</th>
+                            <th>Nazwa</th>
                             <th>Opis</th>
+                            <th>Liczba podsieci</th>
                             <th>Utworzono</th>
                             <th>Akcje</th>
                         </tr>
@@ -112,13 +108,30 @@
         <!-- Import/Export Tab -->
         <div id="import-export" class="tab-content">
             <div class="import-section">
-                <h3>Import z Excel</h3>
+                <h3>Import podsieci z Excel</h3>
                 <div class="file-upload">
                     <input type="file" id="excelFile" accept=".xlsx,.xls" onchange="handleFileSelect()">
-                    <button class="btn btn-primary" onclick="importExcel()">Importuj</button>
+                    <button class="btn btn-primary" onclick="importExcel()">Importuj podsieci</button>
                 </div>
                 <div class="import-info">
-                    <p>Obsługiwane kolumny: ip_address, company_name, assigned_date, is_occupied, description</p>
+                    <p>Obsługiwane kolumny: network, mask, company_id, vlan, description</p>
+                    <p>Przykład: 192.168.1.0, 24, 1, 100, Sieć biurowa</p>
+                </div>
+                
+                <h3>Import firm z Excel</h3>
+                <div class="file-upload">
+                    <input type="file" id="companiesExcelFile" accept=".xlsx,.xls" onchange="handleCompaniesFileSelect()">
+                    <button class="btn btn-primary" onclick="importCompaniesExcel()">Importuj firmy</button>
+                </div>
+                <div class="import-info">
+                    <p>Obsługiwane kolumny: name, description</p>
+                    <p>Przykład: ACME Corp, Firma produkcyjna</p>
+                </div>
+                
+                <h3>Eksport do Excel</h3>
+                <div class="export-buttons">
+                    <button class="btn btn-success" onclick="exportExcel()">Pobierz podsieci (Excel)</button>
+                    <button class="btn btn-success" onclick="exportCompaniesExcel()">Pobierz firmy (Excel)</button>
                 </div>
             </div>
         </div>
@@ -127,8 +140,8 @@
         <div id="analytics" class="tab-content">
             <div class="toolbar">
                 <div class="analytics-filters">
-                    <select id="analyticsSubnetFilter" onchange="updateAnalytics()">
-                        <option value="">Wszystkie podsieci</option>
+                    <select id="analyticsCompanyFilter" onchange="updateAnalytics()">
+                        <option value="">Wszystkie firmy</option>
                     </select>
                     
                     <input type="date" id="analyticsDateFrom" onchange="updateAnalytics()">
@@ -143,48 +156,48 @@
             <div class="analytics-grid">
                 <!-- Main Stats Cards -->
                 <div class="analytics-card">
-                    <h3>📊 Ogólne statystyki</h3>
+                    <h3>📊 Statystyki podsieci</h3>
                     <div class="stats-mini">
                         <div class="stat-mini">
                             <span class="stat-value" id="analyticsTotal">0</span>
-                            <span class="stat-label">Łącznie IP</span>
+                            <span class="stat-label">Łącznie podsieci</span>
                         </div>
                         <div class="stat-mini">
-                            <span class="stat-value occupied" id="analyticsOccupied">0</span>
-                            <span class="stat-label">Zajęte</span>
+                            <span class="stat-value assigned" id="analyticsAssigned">0</span>
+                            <span class="stat-label">Przypisane</span>
                         </div>
                         <div class="stat-mini">
                             <span class="stat-value free" id="analyticsFree">0</span>
                             <span class="stat-label">Wolne</span>
                         </div>
                         <div class="stat-mini">
-                            <span class="stat-value" id="analyticsSubnets">0</span>
-                            <span class="stat-label">Podsieci</span>
+                            <span class="stat-value" id="analyticsCompanies">0</span>
+                            <span class="stat-label">Firmy</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- IP Usage Pie Chart -->
+                <!-- Subnets by Company Pie Chart -->
                 <div class="analytics-card">
-                    <h3>🥧 Wykorzystanie adresów IP</h3>
-                    <canvas id="ipUsageChart"></canvas>
-                </div>
-
-                <!-- Subnets Bar Chart -->
-                <div class="analytics-card">
-                    <h3>📈 Adresy IP według podsieci</h3>
-                    <canvas id="subnetsChart"></canvas>
+                    <h3>🥧 Podsieci według firm</h3>
+                    <canvas id="subnetsUsageChart"></canvas>
                 </div>
 
                 <!-- Companies Bar Chart -->
                 <div class="analytics-card">
-                    <h3>🏢 Top firm według wykorzystania IP</h3>
+                    <h3>🏢 Podsieci według firm</h3>
                     <canvas id="companiesChart"></canvas>
+                </div>
+
+                <!-- VLAN Distribution Chart -->
+                <div class="analytics-card">
+                    <h3>📊 Rozkład VLAN</h3>
+                    <canvas id="vlanChart"></canvas>
                 </div>
 
                 <!-- Monthly Activity Line Chart -->
                 <div class="analytics-card chart-wide">
-                    <h3>📅 Aktywność według miesięcy (przydziały IP)</h3>
+                    <h3>📅 Aktywność według miesięcy (operacje na podsieciach)</h3>
                     <canvas id="monthlyChart"></canvas>
                 </div>
 
@@ -246,55 +259,6 @@
 
     </div>
 
-    <!-- Modal for adding/editing IP -->
-    <div id="ipModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal('ipModal')">&times;</span>
-            <h2 id="ipModalTitle">Dodaj adres IP</h2>
-            <form id="ipForm">
-                <input type="hidden" id="ipId">
-                
-                <div class="form-group">
-                    <label for="ipAddress">Adres IP:</label>
-                    <input type="text" id="ipAddress" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="ipSubnet">Podsieć:</label>
-                    <select id="ipSubnet">
-                        <option value="">Bez podsieci</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="companyName">Firma:</label>
-                    <input type="text" id="companyName">
-                </div>
-                
-                <div class="form-group">
-                    <label for="assignedDate">Data przydziału:</label>
-                    <input type="date" id="assignedDate">
-                </div>
-                
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="isOccupied"> Zajęty
-                    </label>
-                </div>
-                
-                <div class="form-group">
-                    <label for="ipDescription">Opis:</label>
-                    <textarea id="ipDescription" rows="3"></textarea>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">Zapisz</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('ipModal')">Anuluj</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <!-- Modal for adding subnet -->
     <div id="subnetModal" class="modal">
         <div class="modal-content">
@@ -304,13 +268,15 @@
                 <input type="hidden" id="subnetId">
                 
                 <div class="form-group">
-                    <label for="subnetNetwork">Sieć:</label>
+                    <label for="subnetNetwork">Sieć *</label>
                     <input type="text" id="subnetNetwork" placeholder="192.168.1.0" required>
                 </div>
                 
                 <div class="form-group">
-                    <label for="subnetMask">Maska:</label>
+                    <label for="subnetMask">Maska *</label>
                     <select id="subnetMask" required>
+                        <option value="8">/8 (255.0.0.0) - 16M adresów</option>
+                        <option value="16">/16 (255.255.0.0) - 65K adresów</option>
                         <option value="24">/24 (255.255.255.0) - 254 adresy</option>
                         <option value="25">/25 (255.255.255.128) - 126 adresów</option>
                         <option value="26">/26 (255.255.255.192) - 62 adresy</option>
@@ -322,109 +288,25 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="subnetDescription">Opis:</label>
+                    <label for="subnetCompany">Firma</label>
+                    <select id="subnetCompany">
+                        <option value="">Wolna (nieprzypisana)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="subnetVlan">VLAN</label>
+                    <input type="number" id="subnetVlan" min="1" max="4094" placeholder="np. 100">
+                </div>
+                
+                <div class="form-group">
+                    <label for="subnetDescription">Opis</label>
                     <textarea id="subnetDescription" rows="3"></textarea>
                 </div>
                 
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">Utwórz</button>
+                    <button type="submit" class="btn btn-primary">Zapisz</button>
                     <button type="button" class="btn btn-secondary" onclick="closeModal('subnetModal')">Anuluj</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal for bulk IP creation -->
-    <div id="bulkIpModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal('bulkIpModal')">&times;</span>
-            <h2>Masowe dodawanie adresów IP</h2>
-            <form id="bulkIpForm">
-                <div class="form-group">
-                    <label for="bulkSubnet">Podsieć:</label>
-                    <select id="bulkSubnet" required>
-                        <option value="">Wybierz podsieć</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="startIp">Początkowy adres IP:</label>
-                    <input type="text" id="startIp" placeholder="192.168.1.10" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="endIp">Końcowy adres IP:</label>
-                    <input type="text" id="endIp" placeholder="192.168.1.20" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="bulkCompanyName">Firma (dla wszystkich IP):</label>
-                    <input type="text" id="bulkCompanyName">
-                </div>
-                
-                <div class="form-group">
-                    <label for="bulkAssignedDate">Data przydziału (dla wszystkich IP):</label>
-                    <input type="date" id="bulkAssignedDate">
-                </div>
-                
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="bulkIsOccupied"> Wszystkie IP zajęte
-                    </label>
-                </div>
-                
-                <div class="form-group">
-                    <label for="bulkDescription">Opis (dla wszystkich IP):</label>
-                    <textarea id="bulkDescription" rows="3"></textarea>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">Utwórz adresy IP</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('bulkIpModal')">Anuluj</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal for bulk IP deletion -->
-    <div id="bulkDeleteIpModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal('bulkDeleteIpModal')">&times;</span>
-            <h2>⚠️ Masowe usuwanie adresów IP</h2>
-            <div class="import-info" style="background: #fff3cd; border-left: 4px solid #ffc107; margin-bottom: 20px;">
-                <p><strong>Uwaga!</strong> Tej operacji nie można cofnąć. Wszystkie adresy IP w podanym zakresie zostaną usunięte bezpowrotnie.</p>
-            </div>
-            <form id="bulkDeleteIpForm">
-                <div class="form-group">
-                    <label for="deleteSubnet">Podsieć (opcjonalnie):</label>
-                    <select id="deleteSubnet">
-                        <option value="">Wszystkie podsieci</option>
-                    </select>
-                    <small style="color: #666; display: block; margin-top: 5px;">
-                        Jeśli wybrana zostanie podsieć, usuwanie będzie dotyczyć tylko IP z tej podsieci
-                    </small>
-                </div>
-                
-                <div class="form-group">
-                    <label for="deleteStartIp">Początkowy adres IP:</label>
-                    <input type="text" id="deleteStartIp" placeholder="192.168.1.10" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="deleteEndIp">Końcowy adres IP:</label>
-                    <input type="text" id="deleteEndIp" placeholder="192.168.1.20" required>
-                </div>
-                
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="confirmDelete" required> 
-                        Rozumiem, że tej operacji nie można cofnąć
-                    </label>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-danger">Usuń adresy IP</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('bulkDeleteIpModal')">Anuluj</button>
                 </div>
             </form>
         </div>
@@ -484,6 +366,93 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal for adding/editing company -->
+    <div id="companyModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('companyModal')">&times;</span>
+            <h2 id="companyModalTitle">Dodaj firmę</h2>
+            <form id="companyForm">
+                <input type="hidden" id="companyId" value="">
+                <div class="form-group">
+                    <label for="companyName">Nazwa firmy *</label>
+                    <input type="text" id="companyName" required>
+                </div>
+                <div class="form-group">
+                    <label for="companyDescription">Opis</label>
+                    <textarea id="companyDescription"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Zapisz</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('companyModal')">Anuluj</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for dividing subnet -->
+    <div id="divideSubnetModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('divideSubnetModal')">&times;</span>
+            <h2>Podziel podsieć</h2>
+            <form id="divideSubnetForm">
+                <div class="form-group">
+                    <label for="divideSubnetSelect">Wybierz podsieć do podziału</label>
+                    <select id="divideSubnetSelect" required>
+                        <option value="">Wybierz podsieć</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="newMask">Nowa maska podsieci</label>
+                    <input type="number" id="newMask" min="1" max="30" required>
+                    <small>Maska musi być większa niż aktualna</small>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Podziel</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('divideSubnetModal')">Anuluj</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for merging subnets -->
+    <div id="mergeSubnetsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('mergeSubnetsModal')">&times;</span>
+            <h2>Połącz podsieci</h2>
+            <form id="mergeSubnetsForm">
+                <div class="form-group">
+                    <label>Wybrane podsieci do połączenia:</label>
+                    <div id="selectedSubnetsForMerge"></div>
+                    <small>Zaznacz podsieci w tabeli używając checkboxów</small>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Połącz</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('mergeSubnetsModal')">Anuluj</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for assigning free subnets -->
+    <div id="assignFreeSubnetsModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('assignFreeSubnetsModal')">&times;</span>
+            <h2>Przypisz wolne podsieci</h2>
+            <form id="assignFreeSubnetsForm">
+                <div class="form-group">
+                    <label for="assignToCompany">Przypisz wszystkie wolne podsieci do firmy</label>
+                    <select id="assignToCompany" required>
+                        <option value="">Wybierz firmę</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Przypisz</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('assignFreeSubnetsModal')">Anuluj</button>
+                </div>
+            </form>
         </div>
     </div>
 

@@ -63,6 +63,7 @@ db.serialize(() => {
     password_hash TEXT NOT NULL,
     full_name TEXT,
     role TEXT DEFAULT 'user',
+    company_name TEXT,
     created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
     last_login DATETIME
   )`);
@@ -72,49 +73,59 @@ db.serialize(() => {
   const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
   const defaultPasswordHash = bcrypt.hashSync(adminPassword, 10);
   
-  db.run(`INSERT OR IGNORE INTO users (username, password_hash, full_name, role) 
-          VALUES (?, ?, 'Administrator', 'admin')`, [adminUsername, defaultPasswordHash]);
+  db.run(`INSERT OR IGNORE INTO users (username, password_hash, full_name, role, company_name) 
+          VALUES (?, ?, 'Administrator', 'admin', 'System')`, [adminUsername, defaultPasswordHash]);
 
-  // Tabela podsieci
-  db.run(`CREATE TABLE IF NOT EXISTS subnets (
+  // Tabela firm/klientów
+  db.run(`CREATE TABLE IF NOT EXISTS companies (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    network TEXT NOT NULL,
-    mask INTEGER NOT NULL,
+    name TEXT UNIQUE NOT NULL,
     description TEXT,
     created_date DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  // Migracja: dodajemy ograniczenie unikalności dla istniejącej tabeli
-  db.get("PRAGMA table_info(subnets)", (err, info) => {
+  // Dodawanie domyślnych firm
+  db.run(`INSERT OR IGNORE INTO companies (name, description) VALUES ('Wolne', 'Nieprzypisane podsieci')`);
+
+  // Tabela podsieci (nowa struktura)
+  db.run(`CREATE TABLE IF NOT EXISTS subnets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    network TEXT NOT NULL,
+    mask INTEGER NOT NULL,
+    company_id INTEGER,
+    vlan INTEGER,
+    description TEXT,
+    parent_id INTEGER,
+    created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (company_id) REFERENCES companies (id),
+    FOREIGN KEY (parent_id) REFERENCES subnets (id)
+  )`);
+
+  // Додajemy нове kolumnы до існуючої таблиці podsieci
+  db.all("PRAGMA table_info(subnets)", (err, columns) => {
     if (!err) {
-      // Sprawdzamy, czy istnieje już unikalny indeks
-      db.get("SELECT name FROM sqlite_master WHERE type='index' AND name='unique_subnet_network_mask'", (err, index) => {
-        if (!err && !index) {
-          // Tworzymy unikalny indeks, jeśli go nie ma
-          db.run("CREATE UNIQUE INDEX unique_subnet_network_mask ON subnets(network, mask)", (err) => {
-            if (err) {
-              console.error('Błąd tworzenia unikalnego indeksu:', err.message);
-            } else {
-              console.log('Unikalny indeks dla podsieci utworzony pomyślnie');
-            }
-          });
-        }
-      });
+      const existingColumns = columns.map(col => col.name);
+      
+      if (!existingColumns.includes('company_id')) {
+        db.run("ALTER TABLE subnets ADD COLUMN company_id INTEGER REFERENCES companies(id)");
+      }
+      if (!existingColumns.includes('vlan')) {
+        db.run("ALTER TABLE subnets ADD COLUMN vlan INTEGER");
+      }
+      if (!existingColumns.includes('parent_id')) {
+        db.run("ALTER TABLE subnets ADD COLUMN parent_id INTEGER REFERENCES subnets(id)");
+      }
     }
   });
 
-  // Tabela adresów IP
-  db.run(`CREATE TABLE IF NOT EXISTS ip_addresses (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    ip_address TEXT NOT NULL UNIQUE,
-    subnet_id INTEGER,
-    company_name TEXT,
-    assigned_date DATE,
-    is_occupied INTEGER DEFAULT 0,
-    description TEXT,
-    created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (subnet_id) REFERENCES subnets (id)
-  )`);
+  // Usuwamy tabelę ip_addresses jeśli istnieje (system teraz pracuje tylko z podsieciami)
+  db.run("DROP TABLE IF EXISTS ip_addresses", (err) => {
+    if (err) {
+      console.log('Informacja: Tabela ip_addresses nie istnieje lub nie można jej usunąć');
+    } else {
+      console.log('Tabela ip_addresses została usunięta - system teraz pracuje tylko z podsieciami');
+    }
+  });
 
   // Tabela logów audytu
   db.run(`CREATE TABLE IF NOT EXISTS audit_logs (
@@ -251,9 +262,130 @@ app.get('/api/auth-status', (req, res) => {
 
 // Trasy API (teraz chronione autoryzacją)
 
-// Pobranie wszystkich podsieci
+// Pobranie wszystkich firm
+app.get('/api/companies', requireAuth, (req, res) => {
+  db.all("SELECT * FROM companies ORDER BY name", (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    res.json(rows);
+  });
+});
+
+// Utworzenie firmy
+app.post('/api/companies', requireAuth, (req, res) => {
+  const { name, description } = req.body;
+  
+  db.run("INSERT INTO companies (name, description) VALUES (?, ?)",
+    [name, description], function(err) {
+      if (err) {
+        logAudit(req, 'CREATE_COMPANY_FAILED', 'company', null, null, { name, description, error: err.message });
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      
+      const companyData = { id: this.lastID, name, description };
+      logAudit(req, 'CREATE_COMPANY', 'company', this.lastID, null, companyData);
+      res.json(companyData);
+    });
+});
+
+// Редактирование компании
+app.put('/api/companies/:id', requireAuth, (req, res) => {
+  const { id } = req.params;
+  const { name, description } = req.body;
+  
+  // Проверяем, что это не системная компания
+  db.get("SELECT name FROM companies WHERE id = ?", [id], (err, company) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    
+    if (!company) {
+      res.status(404).json({ error: 'Firma nie została znaleziona' });
+      return;
+    }
+    
+    if (company.name === 'Wolne') {
+      res.status(400).json({ error: 'Nie można edytować firmy systemowej' });
+      return;
+    }
+    
+    db.run("UPDATE companies SET name = ?, description = ? WHERE id = ?",
+      [name, description, id], function(err) {
+        if (err) {
+          logAudit(req, 'UPDATE_COMPANY_FAILED', 'company', id, null, { name, description, error: err.message });
+          res.status(500).json({ error: err.message });
+          return;
+        }
+        
+        const companyData = { id: parseInt(id), name, description };
+        logAudit(req, 'UPDATE_COMPANY', 'company', id, null, companyData);
+        res.json(companyData);
+      });
+  });
+});
+
+// Usuwanie firmy
+app.delete('/api/companies/:id', requireAuth, (req, res) => {
+  const { id } = req.params;
+  
+  // Sprawdzamy, czy to nie firma systemowa
+  db.get("SELECT name FROM companies WHERE id = ?", [id], (err, company) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    
+    if (!company) {
+      res.status(404).json({ error: 'Firma nie została znaleziona' });
+      return;
+    }
+    
+    if (company.name === 'Wolne') {
+      res.status(400).json({ error: 'Nie można usunąć firmy systemowej' });
+      return;
+    }
+    
+    // Sprawdzamy, czy firma ma przypisane podsieci
+    db.get("SELECT COUNT(*) as count FROM subnets WHERE company_id = ?", [id], (err, result) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      
+      if (result.count > 0) {
+        res.status(400).json({ error: 'Nie można usunąć firmy, która ma przypisane podsieci' });
+        return;
+      }
+      
+      // Usuwamy firmę
+      db.run("DELETE FROM companies WHERE id = ?", [id], function(err) {
+        if (err) {
+          logAudit(req, 'DELETE_COMPANY_FAILED', 'company', id, null, { error: err.message });
+          res.status(500).json({ error: err.message });
+          return;
+        }
+        
+        logAudit(req, 'DELETE_COMPANY', 'company', id, null, { name: company.name });
+        res.json({ message: 'Firma została pomyślnie usunięta' });
+      });
+    });
+  });
+});
+
+// Pobranie wszystkich podsieci z informacjami o firmach
 app.get('/api/subnets', requireAuth, (req, res) => {
-  db.all("SELECT * FROM subnets ORDER BY created_date DESC", (err, rows) => {
+  const query = `
+    SELECT s.*, c.name as company_name 
+    FROM subnets s 
+    LEFT JOIN companies c ON s.company_id = c.id 
+    ORDER BY s.network, s.mask
+  `;
+  
+  db.all(query, (err, rows) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
@@ -264,21 +396,17 @@ app.get('/api/subnets', requireAuth, (req, res) => {
 
 // Utworzenie podsieci
 app.post('/api/subnets', requireAuth, (req, res) => {
-  const { network, mask, description } = req.body;
+  const { network, mask, company_id, vlan, description } = req.body;
   
-  db.run("INSERT INTO subnets (network, mask, description) VALUES (?, ?, ?)",
-    [network, mask, description], function(err) {
+  db.run("INSERT INTO subnets (network, mask, company_id, vlan, description) VALUES (?, ?, ?, ?, ?)",
+    [network, mask, company_id, vlan, description], function(err) {
       if (err) {
-        logAudit(req, 'CREATE_SUBNET_FAILED', 'subnet', null, null, { network, mask, description, error: err.message });
-        if (err.code === 'SQLITE_CONSTRAINT' && err.message.includes('UNIQUE')) {
-          res.status(400).json({ error: `Podsieć ${network}/${mask} już istnieje` });
-        } else {
-          res.status(500).json({ error: err.message });
-        }
+        logAudit(req, 'CREATE_SUBNET_FAILED', 'subnet', null, null, { network, mask, company_id, vlan, description, error: err.message });
+        res.status(500).json({ error: err.message });
         return;
       }
       
-      const subnetData = { id: this.lastID, network, mask, description };
+      const subnetData = { id: this.lastID, network, mask, company_id, vlan, description };
       logAudit(req, 'CREATE_SUBNET', 'subnet', this.lastID, null, subnetData);
       res.json(subnetData);
     });
@@ -287,7 +415,7 @@ app.post('/api/subnets', requireAuth, (req, res) => {
 // Edytowanie podsieci
 app.put('/api/subnets/:id', requireAuth, (req, res) => {
   const { id } = req.params;
-  const { network, mask, description } = req.body;
+  const { network, mask, company_id, vlan, description } = req.body;
   
   // Najpierw pobieramy stare wartości
   db.get("SELECT * FROM subnets WHERE id = ?", [id], (err, oldSubnet) => {
@@ -296,15 +424,11 @@ app.put('/api/subnets/:id', requireAuth, (req, res) => {
       return;
     }
     
-    db.run("UPDATE subnets SET network = ?, mask = ?, description = ? WHERE id = ?",
-      [network, mask, description, id], function(err) {
+    db.run("UPDATE subnets SET network = ?, mask = ?, company_id = ?, vlan = ?, description = ? WHERE id = ?",
+      [network, mask, company_id, vlan, description, id], function(err) {
         if (err) {
-          logAudit(req, 'UPDATE_SUBNET_FAILED', 'subnet', id, oldSubnet, { network, mask, description, error: err.message });
-          if (err.code === 'SQLITE_CONSTRAINT' && err.message.includes('UNIQUE')) {
-            res.status(400).json({ error: `Podsieć ${network}/${mask} już istnieje` });
-          } else {
-            res.status(500).json({ error: err.message });
-          }
+          logAudit(req, 'UPDATE_SUBNET_FAILED', 'subnet', id, oldSubnet, { network, mask, company_id, vlan, description, error: err.message });
+          res.status(500).json({ error: err.message });
           return;
         }
         if (this.changes === 0) {
@@ -312,248 +436,298 @@ app.put('/api/subnets/:id', requireAuth, (req, res) => {
           return;
         }
         
-        const newSubnet = { id, network, mask, description };
+        const newSubnet = { id, network, mask, company_id, vlan, description };
         logAudit(req, 'UPDATE_SUBNET', 'subnet', id, oldSubnet, newSubnet);
-        res.json({ message: 'Podsieć została zaktualizowana', id, network, mask, description });
+        res.json({ message: 'Podsieć została zaktualizowana', ...newSubnet });
       });
   });
 });
 
-// Pobranie wszystkich adresów IP
-app.get('/api/ip-addresses', requireAuth, (req, res) => {
-  const { subnet_id, occupied, search } = req.query;
-  
-  let query = `SELECT ip.*, s.network, s.mask 
-               FROM ip_addresses ip 
-               LEFT JOIN subnets s ON ip.subnet_id = s.id 
-               WHERE 1=1`;
-  let params = [];
-
-  if (subnet_id) {
-    query += " AND ip.subnet_id = ?";
-    params.push(subnet_id);
-  }
-
-  if (occupied !== undefined) {
-    query += " AND ip.is_occupied = ?";
-    params.push(occupied);
-  }
-
-  if (search) {
-    query += " AND (ip.ip_address LIKE ? OR ip.company_name LIKE ? OR ip.description LIKE ?)";
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
-  }
-
-  query += " ORDER BY ip.ip_address";
-
-  db.all(query, params, (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    res.json(rows);
-  });
-});
-
-// Dodanie adresu IP
-app.post('/api/ip-addresses', requireAuth, (req, res) => {
-  const { ip_address, subnet_id, company_name, assigned_date, is_occupied, description } = req.body;
-  
-  db.run(`INSERT INTO ip_addresses (ip_address, subnet_id, company_name, assigned_date, is_occupied, description) 
-          VALUES (?, ?, ?, ?, ?, ?)`,
-    [ip_address, subnet_id, company_name, assigned_date, is_occupied, description], 
-    function(err) {
-      if (err) {
-        logAudit(req, 'CREATE_IP_FAILED', 'ip_address', null, null, { ip_address, error: err.message });
-        res.status(500).json({ error: err.message });
-        return;
-      }
-      
-      const ipData = { id: this.lastID, ip_address, subnet_id, company_name, assigned_date, is_occupied, description };
-      logAudit(req, 'CREATE_IP', 'ip_address', this.lastID, null, ipData);
-      res.json(ipData);
-    });
-});
-
-// Aktualizacja adresu IP
-app.put('/api/ip-addresses/:id', requireAuth, (req, res) => {
+// Usunięcie podsieci
+app.delete('/api/subnets/:id', requireAuth, (req, res) => {
   const { id } = req.params;
-  const { ip_address, subnet_id, company_name, assigned_date, is_occupied, description } = req.body;
   
-  // Pobieramy stare wartości
-  db.get("SELECT * FROM ip_addresses WHERE id = ?", [id], (err, oldIp) => {
+  // Pobieramy dane podsieci przed usunięciem
+  db.get("SELECT * FROM subnets WHERE id = ?", [id], (err, subnet) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
     
-    db.run(`UPDATE ip_addresses 
-            SET ip_address = ?, subnet_id = ?, company_name = ?, assigned_date = ?, is_occupied = ?, description = ?
-            WHERE id = ?`,
-      [ip_address, subnet_id, company_name, assigned_date, is_occupied, description, id],
-      function(err) {
-        if (err) {
-          logAudit(req, 'UPDATE_IP_FAILED', 'ip_address', id, oldIp, { ip_address, error: err.message });
-          res.status(500).json({ error: err.message });
-          return;
-        }
-        
-        const newIp = { id, ip_address, subnet_id, company_name, assigned_date, is_occupied, description };
-        logAudit(req, 'UPDATE_IP', 'ip_address', id, oldIp, newIp);
-        res.json({ message: 'Adres IP został zaktualizowany' });
-      });
-  });
-});
-
-// Masowe usuwanie adresów IP
-app.delete('/api/ip-addresses/bulk', requireAuth, (req, res) => {
-  console.log('=== MASOWE USUWANIE ADRESÓW IP ===');
-  console.log('Otrzymano żądanie body:', req.body);
-  const { start_ip, end_ip, subnet_id } = req.body;
-  
-  // Funkcja do przekształcenia IP na liczbę
-  function ipToNumber(ip) {
-    return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
-  }
-  
-  try {
-    const startNum = ipToNumber(start_ip);
-    const endNum = ipToNumber(end_ip);
-    
-    if (startNum > endNum) {
-      res.status(400).json({ error: 'Początkowy IP musi być mniejszy od końcowego IP' });
-      return;
-    }
-    
-    const totalIps = endNum - startNum + 1;
-    if (totalIps > 1000) {
-      res.status(400).json({ error: 'Maksymalna liczba adresów IP do masowego usuwania: 1000' });
-      return;
-    }
-    
-    // Tworzymy tablicę adresów IP w zakresie
-    const ipList = [];
-    for (let i = startNum; i <= endNum; i++) {
-      const ip = [(i >>> 24) & 255, (i >>> 16) & 255, (i >>> 8) & 255, i & 255].join('.');
-      ipList.push(ip);
-    }
-    
-    // Tworzymy zapytanie do wyszukiwania adresów IP w zakresie
-    let query = `SELECT * FROM ip_addresses WHERE ip_address IN (${ipList.map(() => '?').join(',')})`;
-    let params = [...ipList];
-    
-    if (subnet_id) {
-      query += ` AND subnet_id = ?`;
-      params.push(subnet_id);
-    }
-    
-    // Najpierw pobieramy adresy IP do logowania
-    db.all(query, params, (err, ipsToDelete) => {
+    // Usuwamy podsieć
+    db.run("DELETE FROM subnets WHERE id = ?", [id], function(err) {
       if (err) {
-        logAudit(req, 'BULK_DELETE_IP_FAILED', 'ip_address', null, null, { 
-          start_ip, 
-          end_ip, 
-          subnet_id,
-          error: err.message 
-        });
+        logAudit(req, 'DELETE_SUBNET_FAILED', 'subnet', id, subnet, { error: err.message });
         res.status(500).json({ error: err.message });
         return;
       }
       
-      if (ipsToDelete.length === 0) {
-        res.json({ 
-          message: 'Brak adresów IP do usunięcia w podanym zakresie',
-          deleted_count: 0,
-          deleted_ips: []
+      logAudit(req, 'DELETE_SUBNET', 'subnet', id, subnet, null);
+      res.json({ message: 'Podsieć została usunięta' });
+    });
+  });
+});
+
+// Podziały podsieci - API do rozdzielania podsieci na mniejsze
+app.post('/api/subnets/:id/divide', requireAuth, (req, res) => {
+  const { id } = req.params;
+  const { new_mask } = req.body;
+  
+  // Pobieramy dane o podsieci rodzicielskiej
+  db.get("SELECT * FROM subnets WHERE id = ?", [id], (err, subnet) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    
+    if (!subnet) {
+      res.status(404).json({ error: 'Podsieć nie została znaleziona' });
+      return;
+    }
+    
+    if (new_mask <= subnet.mask) {
+      res.status(400).json({ error: 'Nowa maska musi być większa niż aktualna' });
+      return;
+    }
+    
+    // Obliczamy liczbę nowych podsieci
+    const subnetCount = Math.pow(2, new_mask - subnet.mask);
+    const subnetSize = Math.pow(2, 32 - new_mask);
+    
+    // Konwertujemy adres sieciowy na liczbę
+    function ipToNumber(ip) {
+      return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
+    }
+    
+    function numberToIp(num) {
+      return [(num >>> 24) & 255, (num >>> 16) & 255, (num >>> 8) & 255, num & 255].join('.');
+    }
+    
+    const baseNetwork = ipToNumber(subnet.network);
+    const newSubnets = [];
+    
+    // Tworzymy nowe podsieci
+    for (let i = 0; i < subnetCount; i++) {
+      const newNetwork = numberToIp(baseNetwork + (i * subnetSize));
+      newSubnets.push({
+        network: newNetwork,
+        mask: new_mask,
+        company_id: subnet.company_id,
+        vlan: subnet.vlan,
+        description: `Podsieć podzielona z ${subnet.network}/${subnet.mask}`,
+        parent_id: id
+      });
+    }
+    
+    // Zapisujemy nowe podsieci do bazy danych
+    const stmt = db.prepare("INSERT INTO subnets (network, mask, company_id, vlan, description, parent_id) VALUES (?, ?, ?, ?, ?, ?)");
+    const insertedSubnets = [];
+    
+    db.serialize(() => {
+      newSubnets.forEach((newSubnet, index) => {
+        stmt.run([newSubnet.network, newSubnet.mask, newSubnet.company_id, newSubnet.vlan, newSubnet.description, newSubnet.parent_id], function(err) {
+          if (!err) {
+            insertedSubnets.push({ id: this.lastID, ...newSubnet });
+          }
+          
+          if (index === newSubnets.length - 1) {
+            stmt.finalize();
+            logAudit(req, 'DIVIDE_SUBNET', 'subnet', id, subnet, { new_mask, created_subnets: insertedSubnets.length });
+            res.json({ 
+              message: `Podsieć została podzielona na ${insertedSubnets.length} mniejszych podsieci`,
+              parent_subnet: subnet,
+              new_subnets: insertedSubnets
+            });
+          }
         });
+      });
+    });
+  });
+});
+
+// Łączenie podsieci - API do łączenia sąsiadujących podsieci
+app.post('/api/subnets/merge', requireAuth, (req, res) => {
+  const { subnet_ids } = req.body;
+  
+  if (!subnet_ids || subnet_ids.length < 2) {
+    res.status(400).json({ error: 'Należy wybrać co najmniej 2 podsieci do połączenia' });
+    return;
+  }
+  
+  // Pobieramy dane o podsieci do połączenia
+  const placeholders = subnet_ids.map(() => '?').join(',');
+  const query = `SELECT * FROM subnets WHERE id IN (${placeholders}) ORDER BY network`;
+  
+  db.all(query, subnet_ids, (err, subnets) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    
+    if (subnets.length !== subnet_ids.length) {
+      res.status(404).json({ error: 'Nie wszystkie podsieci zostały znalezione' });
+      return;
+    }
+    
+    // Sprawdzamy czy wszystkie podsieci mają tę samą maskę
+    const firstMask = subnets[0].mask;
+    if (!subnets.every(subnet => subnet.mask === firstMask)) {
+      res.status(400).json({ error: 'Wszystkie podsieci muszą mieć tę samą maskę' });
+      return;
+    }
+    
+    // Sprawdzamy czy podsieci są sąsiadujące
+    function ipToNumber(ip) {
+      return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
+    }
+    
+    function numberToIp(num) {
+      return [(num >>> 24) & 255, (num >>> 16) & 255, (num >>> 8) & 255, num & 255].join('.');
+    }
+    
+    const subnetSize = Math.pow(2, 32 - firstMask);
+    const sortedSubnets = subnets.sort((a, b) => ipToNumber(a.network) - ipToNumber(b.network));
+    
+    // Sprawdzamy ciągłość
+    for (let i = 1; i < sortedSubnets.length; i++) {
+      const prevEnd = ipToNumber(sortedSubnets[i-1].network) + subnetSize;
+      const currentStart = ipToNumber(sortedSubnets[i].network);
+      if (prevEnd !== currentStart) {
+        res.status(400).json({ error: 'Podsieci muszą być sąsiadujące' });
         return;
       }
+    }
+    
+    // Obliczamy nową podsieć
+    const newMask = firstMask - Math.log2(subnets.length);
+    if (newMask < 0 || newMask % 1 !== 0) {
+      res.status(400).json({ error: 'Nie można połączyć podsieci - nieprawidłowa liczba' });
+      return;
+    }
+    
+    const newNetwork = sortedSubnets[0].network;
+    const firstSubnet = sortedSubnets[0];
+    
+    // Tworzymy nową podsieć
+    const mergedSubnet = {
+      network: newNetwork,
+      mask: newMask,
+      company_id: firstSubnet.company_id,
+      vlan: firstSubnet.vlan,
+      description: `Podsieć połączona z ${subnets.length} podsieci`
+    };
+    
+    db.serialize(() => {
+      db.run("BEGIN TRANSACTION");
       
-      // Teraz usuwamy znalezione adresy IP
-      const existingIps = ipsToDelete.map(ip => ip.ip_address);
-      
-      // Dodajemy informacje debugowania
-      console.log(`Znaleziono IP do usunięcia: ${existingIps.length}`);
-      console.log('Adresy IP:', existingIps);
-      
-      let deleteQuery = `DELETE FROM ip_addresses WHERE ip_address IN (${existingIps.map(() => '?').join(',')})`;
-      let deleteParams = [...existingIps];
-      
-      if (subnet_id) {
-        deleteQuery += ` AND subnet_id = ?`;
-        deleteParams.push(subnet_id);
-      }
-      
-      console.log('Delete query:', deleteQuery);
-      console.log('Delete params:', deleteParams);
-      
-      db.run(deleteQuery, deleteParams, function(err) {
-        if (err) {
-          console.error('Błąd podczas usuwania:', err);
-          logAudit(req, 'BULK_DELETE_IP_FAILED', 'ip_address', null, null, { 
-            start_ip, 
-            end_ip, 
-            subnet_id,
-            error: err.message 
+      // Dodajemy nową podsieć
+      db.run("INSERT INTO subnets (network, mask, company_id, vlan, description) VALUES (?, ?, ?, ?, ?)",
+        [mergedSubnet.network, mergedSubnet.mask, mergedSubnet.company_id, mergedSubnet.vlan, mergedSubnet.description],
+        function(err) {
+          if (err) {
+            db.run("ROLLBACK");
+            res.status(500).json({ error: err.message });
+            return;
+          }
+          
+          const newSubnetId = this.lastID;
+          
+          // Usuwamy stare podsieci
+          const deletePlaceholders = subnet_ids.map(() => '?').join(',');
+          db.run(`DELETE FROM subnets WHERE id IN (${deletePlaceholders})`, subnet_ids, function(err) {
+            if (err) {
+              db.run("ROLLBACK");
+              res.status(500).json({ error: err.message });
+              return;
+            }
+            
+            db.run("COMMIT");
+            
+            logAudit(req, 'MERGE_SUBNETS', 'subnet', newSubnetId, subnets, mergedSubnet);
+            res.json({
+              message: `Połączono ${subnets.length} podsieci w jedną`,
+              merged_subnet: { id: newSubnetId, ...mergedSubnet },
+              original_subnets: subnets
+            });
           });
-          res.status(500).json({ error: err.message });
-          return;
-        }
-        
-        const deletedCount = this.changes;
-        console.log(`Faktycznie usunięto rekordów: ${deletedCount}`);
-        
-        const deletedIps = ipsToDelete.map(ip => ip.ip_address);
-        
-        // Logujemy masowe usuwanie
-        const bulkDeleteData = { 
-          start_ip, 
-          end_ip, 
-          subnet_id, 
-          deleted_count: deletedCount,
-          deleted_ips: deletedIps
-        };
-        logAudit(req, 'BULK_DELETE_IP', 'ip_address', null, ipsToDelete, bulkDeleteData);
-        
-        res.json({ 
-          message: `Usunięto ${deletedCount} adresów IP z zakresu ${start_ip} - ${end_ip}`,
-          deleted_count: deletedCount,
-          deleted_ips: deletedIps
         });
-      });
     });
-    
-  } catch (error) {
-    logAudit(req, 'BULK_DELETE_IP_FAILED', 'ip_address', null, null, { 
-      start_ip, 
-      end_ip, 
-      subnet_id,
-      error: error.message 
-    });
-    res.status(500).json({ error: 'Błąd podczas masowego usuwania adresów IP: ' + error.message });
-  }
+  });
 });
 
-// Usunięcie adresu IP
-app.delete('/api/ip-addresses/:id', requireAuth, (req, res) => {
-  const { id } = req.params;
+// Masowe przypisanie wolnych podsieci do firmy
+app.post('/api/subnets/assign-free', requireAuth, (req, res) => {
+  const { company_id } = req.body;
   
-  // Pobieramy dane przed usunięciem
-  db.get("SELECT * FROM ip_addresses WHERE id = ?", [id], (err, ip) => {
+  if (!company_id) {
+    res.status(400).json({ error: 'Należy podać ID firmy' });
+    return;
+  }
+  
+  // Sprawdzamy czy firma istnieje
+  db.get("SELECT * FROM companies WHERE id = ?", [company_id], (err, company) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
     
-    db.run("DELETE FROM ip_addresses WHERE id = ?", [id], function(err) {
+    if (!company) {
+      res.status(404).json({ error: 'Firma nie została znaleziona' });
+      return;
+    }
+    
+    // Znajdźemy wszystkie podsieci bez przypisanej firmy (company_id IS NULL lub company_id = 2 "Wolne")
+    db.all("SELECT * FROM subnets WHERE company_id IS NULL OR company_id = 2", (err, freeSubnets) => {
       if (err) {
-        logAudit(req, 'DELETE_IP_FAILED', 'ip_address', id, ip, { error: err.message });
         res.status(500).json({ error: err.message });
         return;
       }
       
-      logAudit(req, 'DELETE_IP', 'ip_address', id, ip, null);
-      res.json({ message: 'Adres IP został usunięty' });
+      if (freeSubnets.length === 0) {
+        res.json({ 
+          message: 'Brak wolnych podsieci do przypisania',
+          assigned_count: 0,
+          assigned_subnets: []
+        });
+        return;
+      }
+      
+      const subnetIds = freeSubnets.map(subnet => subnet.id);
+      const placeholders = subnetIds.map(() => '?').join(',');
+      
+      // Aktualizujemy wszystkie wolne podsieci
+      db.run(`UPDATE subnets SET company_id = ? WHERE id IN (${placeholders})`, 
+        [company_id, ...subnetIds], function(err) {
+          if (err) {
+            logAudit(req, 'ASSIGN_FREE_SUBNETS_FAILED', 'subnet', null, null, {
+              company_id,
+              subnet_count: freeSubnets.length,
+              error: err.message
+            });
+            res.status(500).json({ error: err.message });
+            return;
+          }
+          
+          const assignedCount = this.changes;
+          
+          logAudit(req, 'ASSIGN_FREE_SUBNETS', 'subnet', null, freeSubnets, {
+            company_id,
+            company_name: company.name,
+            assigned_count: assignedCount,
+            subnet_ids: subnetIds
+          });
+          
+          res.json({
+            message: `Przypisano ${assignedCount} wolnych podsieci do firmy ${company.name}`,
+            assigned_count: assignedCount,
+            assigned_subnets: freeSubnets.map(subnet => ({
+              ...subnet,
+              company_id: company_id,
+              company_name: company.name
+            })),
+            company: company
+          });
+        });
     });
   });
 });
@@ -569,97 +743,21 @@ app.delete('/api/subnets/:id', requireAuth, (req, res) => {
       return;
     }
     
-    // Najpierw odłączamy adresy IP od tej podsieci
-    db.run("UPDATE ip_addresses SET subnet_id = NULL WHERE subnet_id = ?", [id], function(err) {
+    // Usuwamy podsieć
+    db.run("DELETE FROM subnets WHERE id = ?", [id], function(err) {
       if (err) {
+        logAudit(req, 'DELETE_SUBNET_FAILED', 'subnet', id, subnet, { error: err.message });
         res.status(500).json({ error: err.message });
         return;
       }
       
-      // Następnie usuwamy samą podsieć
-      db.run("DELETE FROM subnets WHERE id = ?", [id], function(err) {
-        if (err) {
-          logAudit(req, 'DELETE_SUBNET_FAILED', 'subnet', id, subnet, { error: err.message });
-          res.status(500).json({ error: err.message });
-          return;
-        }
-        
-        logAudit(req, 'DELETE_SUBNET', 'subnet', id, subnet, null);
-        res.json({ message: 'Podsieć została usunięta' });
-      });
+      logAudit(req, 'DELETE_SUBNET', 'subnet', id, subnet, null);
+      res.json({ message: 'Podsieć została usunięta' });
     });
   });
 });
 
-// Masowe dodawanie adresów IP
-app.post('/api/ip-addresses/bulk', requireAuth, (req, res) => {
-  const { subnet_id, start_ip, end_ip, company_name, assigned_date, is_occupied, description } = req.body;
-  
-  // Funkcja do przekształcenia IP na liczbę
-  function ipToNumber(ip) {
-    return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet), 0) >>> 0;
-  }
-  
-  // Funkcja do przekształcenia liczby na IP
-  function numberToIp(num) {
-    return [(num >>> 24) & 255, (num >>> 16) & 255, (num >>> 8) & 255, num & 255].join('.');
-  }
-  
-  try {
-    const startNum = ipToNumber(start_ip);
-    const endNum = ipToNumber(end_ip);
-    
-    if (startNum > endNum) {
-      res.status(400).json({ error: 'Początkowy IP musi być mniejszy od końcowego IP' });
-      return;
-    }
-    
-    const totalIps = endNum - startNum + 1;
-    if (totalIps > 1000) {
-      res.status(400).json({ error: 'Maksymalna liczba adresów IP do masowego tworzenia: 1000' });
-      return;
-    }
-    
-    let createdCount = 0;
-    let errors = [];
-    
-    const stmt = db.prepare(`INSERT OR IGNORE INTO ip_addresses 
-                            (ip_address, subnet_id, company_name, assigned_date, is_occupied, description) 
-                            VALUES (?, ?, ?, ?, ?, ?)`);
-    
-    for (let i = startNum; i <= endNum; i++) {
-      const ip = numberToIp(i);
-      
-      try {
-        const result = stmt.run(ip, subnet_id, company_name, assigned_date, is_occupied, description);
-        if (result.changes > 0) {
-          createdCount++;
-        }
-      } catch (err) {
-        errors.push(`IP ${ip}: ${err.message}`);
-      }
-    }
-    
-    stmt.finalize();
-    
-    // Logujemy masowe tworzenie IP
-    const bulkData = { start_ip, end_ip, subnet_id, company_name, assigned_date, is_occupied, description, created_count: createdCount };
-    logAudit(req, 'BULK_CREATE_IP', 'ip_address', null, null, bulkData);
-    
-    res.json({ 
-      message: `Utworzono ${createdCount} adresów IP z ${totalIps}`,
-      created_count: createdCount,
-      total_requested: totalIps,
-      errors: errors
-    });
-    
-  } catch (error) {
-    logAudit(req, 'BULK_CREATE_IP_FAILED', 'ip_address', null, null, { start_ip, end_ip, error: error.message });
-    res.status(500).json({ error: 'Błąd podczas masowego tworzenia adresów IP: ' + error.message });
-  }
-});
-
-// Import z Excel
+// Import z Excel - tylko podsieci
 app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res) => {
   try {
     const workbook = XLSX.readFile(req.file.path);
@@ -669,44 +767,193 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
 
     let imported = 0;
     let errors = [];
+    let companiesCreated = 0;
+    
+    // Кэш компаний для избежания дублирования запросов
+    const companyCache = new Map();
 
-    data.forEach((row, index) => {
-      const { ip_address, company_name, assigned_date, is_occupied, description } = row;
+    // Функция для получения или создания компании
+    const getOrCreateCompany = (companyName, callback) => {
+      if (!companyName || companyName.trim() === '') {
+        return callback(null, null);
+      }
       
-      if (ip_address) {
-        db.run(`INSERT OR IGNORE INTO ip_addresses 
-                (ip_address, company_name, assigned_date, is_occupied, description) 
-                VALUES (?, ?, ?, ?, ?)`,
-          [ip_address, company_name || '', assigned_date || null, is_occupied || 0, description || ''],
+      const normalizedName = companyName.trim();
+      
+      // Проверяем кэш
+      if (companyCache.has(normalizedName)) {
+        return callback(null, companyCache.get(normalizedName));
+      }
+      
+      // Ищем существующую компанию
+      db.get("SELECT id FROM companies WHERE name = ?", [normalizedName], (err, row) => {
+        if (err) {
+          return callback(err, null);
+        }
+        
+        if (row) {
+          // Компания существует
+          companyCache.set(normalizedName, row.id);
+          return callback(null, row.id);
+        }
+        
+        // Создаем новую компанию
+        db.run("INSERT INTO companies (name, description) VALUES (?, ?)", 
+          [normalizedName, `Firma utworzona podczas importu`], 
           function(err) {
             if (err) {
-              errors.push(`Wiersz ${index + 1}: ${err.message}`);
+              return callback(err, null);
+            }
+            companiesCreated++;
+            companyCache.set(normalizedName, this.lastID);
+            callback(null, this.lastID);
+          });
+      });
+    };
+
+    // Обрабатываем каждую строку
+    let processedRows = 0;
+    const totalRows = data.length;
+
+    data.forEach((row, index) => {
+      // Поддерживаем как польские, так и английские названия колонок
+      const network = row.network || row['Sieć'];
+      const mask = row.mask || row['Maska'];
+      const company = row.company || row['Firma'] || row.company_name;
+      const vlan = row.vlan || row['VLAN'];
+      const description = row.description || row['Opis'];
+      
+      if (!network || !mask) {
+        errors.push(`Wiersz ${index + 1}: Brak wymaganych danych (sieć i maska)`);
+        processedRows++;
+        if (processedRows === totalRows) {
+          sendResponse();
+        }
+        return;
+      }
+
+      getOrCreateCompany(company, (err, companyId) => {
+        if (err) {
+          errors.push(`Wiersz ${index + 1}: Błąd firmy: ${err.message}`);
+          processedRows++;
+          if (processedRows === totalRows) {
+            sendResponse();
+          }
+          return;
+        }
+
+        db.run(`INSERT OR IGNORE INTO subnets 
+                (network, mask, company_id, vlan, description) 
+                VALUES (?, ?, ?, ?, ?)`,
+          [network, parseInt(mask), companyId, vlan || null, description || ''],
+          function(insertErr) {
+            if (insertErr) {
+              errors.push(`Wiersz ${index + 1}: ${insertErr.message}`);
             } else if (this.changes > 0) {
               imported++;
             }
+            
+            processedRows++;
+            if (processedRows === totalRows) {
+              sendResponse();
+            }
           });
-      }
+      });
     });
 
-    setTimeout(() => {
+    const sendResponse = () => {
       // Logujemy import
-      logAudit(req, 'IMPORT_EXCEL', 'ip_address', null, null, { 
+      logAudit(req, 'IMPORT_EXCEL', 'subnet', null, null, { 
         filename: req.file.originalname, 
         imported_count: imported, 
+        companies_created: companiesCreated,
         total_rows: data.length,
         errors_count: errors.length 
       });
       
+      let message = `Zaimportowano ${imported} podsieci`;
+      if (companiesCreated > 0) {
+        message += ` i utworzono ${companiesCreated} nowych firm`;
+      }
+      
       res.json({ 
-        message: `Zaimportowano ${imported} rekordów`, 
-        errors: errors 
+        message: message, 
+        errors: errors,
+        stats: {
+          imported_subnets: imported,
+          created_companies: companiesCreated,
+          total_rows: data.length
+        }
       });
-    }, 1000);
+    };
+
+    // Если нет данных для обработки
+    if (totalRows === 0) {
+      sendResponse();
+    }
 
   } catch (error) {
-    logAudit(req, 'IMPORT_EXCEL_FAILED', 'ip_address', null, null, { error: error.message });
+    logAudit(req, 'IMPORT_EXCEL_FAILED', 'subnet', null, null, { error: error.message });
     res.status(500).json({ error: 'Błąd podczas przetwarzania pliku Excel' });
   }
+});
+
+// Eksport podsieci do Excel
+app.get('/api/export-excel', requireAuth, (req, res) => {
+  const query = `
+    SELECT s.network, s.mask, s.vlan, s.description, s.created_date,
+           c.name as company_name
+    FROM subnets s 
+    LEFT JOIN companies c ON s.company_id = c.id 
+    ORDER BY s.network, s.mask
+  `;
+  
+  db.all(query, (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    
+    try {
+      // Konwertujemy dane do formatu Excel
+      const exportData = rows.map(row => ({
+        'Sieć': row.network,
+        'Maska': row.mask,
+        'VLAN': row.vlan || '',
+        'Firma': row.company_name || 'Wolne',
+        'Opis': row.description || '',
+        'Data utworzenia': row.created_date
+      }));
+      
+      const workbook = XLSX.utils.book_new();
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Podsieci');
+      
+      const fileName = `podsieci_${new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')}.xlsx`;
+      const filePath = path.join(__dirname, 'uploads', fileName);
+      
+      XLSX.writeFile(workbook, filePath);
+      
+      logAudit(req, 'EXPORT_EXCEL', 'subnet', null, null, { 
+        filename: fileName, 
+        exported_count: rows.length 
+      });
+      
+      res.download(filePath, fileName, (err) => {
+        if (err) {
+          console.error('Błąd podczas pobierania pliku:', err);
+        }
+        // Usuwamy plik po pobraniu
+        fs.unlink(filePath, (unlinkErr) => {
+          if (unlinkErr) console.error('Błąd podczas usuwania pliku:', unlinkErr);
+        });
+      });
+      
+    } catch (error) {
+      logAudit(req, 'EXPORT_EXCEL_FAILED', 'subnet', null, null, { error: error.message });
+      res.status(500).json({ error: 'Błąd podczas tworzenia pliku Excel' });
+    }
+  });
 });
 
 // Pobranie logów audytu
@@ -783,135 +1030,145 @@ app.get('/api/audit-logs/:id', requireAuth, (req, res) => {
   });
 });
 
-// Statystyki
+// Statystyki - tylko podsieci
 app.get('/api/stats', requireAuth, (req, res) => {
-  db.all(`SELECT 
-    COUNT(*) as total_ips,
-    SUM(CASE WHEN is_occupied = 1 THEN 1 ELSE 0 END) as occupied_ips,
-    SUM(CASE WHEN is_occupied = 0 THEN 1 ELSE 0 END) as free_ips,
-    (SELECT COUNT(*) FROM subnets) as total_subnets
-    FROM ip_addresses`, (err, rows) => {
+  // Получаем общую статистику
+  db.get(`SELECT COUNT(*) as total_subnets FROM subnets`, (err, totalResult) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
     
-    const stats = rows[0] || {
-      total_ips: 0,
-      occupied_ips: 0,
-      free_ips: 0,
-      total_subnets: 0
-    };
-    
-    res.json(stats);
+    // Получаем количество свободных подсетей (company_id = 2 или NULL)
+    db.get(`SELECT COUNT(*) as free_subnets FROM subnets WHERE company_id = 2 OR company_id IS NULL`, (err, freeResult) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      
+      // Получаем количество компаний
+      db.get(`SELECT COUNT(*) as total_companies FROM companies`, (err, companiesResult) => {
+        if (err) {
+          res.status(500).json({ error: err.message });
+          return;
+        }
+        
+        const total_subnets = totalResult.total_subnets || 0;
+        const free_subnets = freeResult.free_subnets || 0;
+        const assigned_subnets = total_subnets - free_subnets;
+        const total_companies = companiesResult.total_companies || 0;
+        
+        res.json({
+          total_subnets,
+          free_subnets,
+          assigned_subnets,
+          total_companies
+        });
+      });
+    });
   });
 });
 
-// Аналитика - общая статистика с фильтрами
+// Аналитyка - ogólna statystyka podsieci
 app.get('/api/analytics/stats', requireAuth, (req, res) => {
-  const { subnet_id, date_from, date_to } = req.query;
+  const { company_id, date_from, date_to } = req.query;
   
-  let query = `SELECT 
-    COUNT(*) as total_ips,
-    SUM(CASE WHEN is_occupied = 1 THEN 1 ELSE 0 END) as occupied_ips,
-    SUM(CASE WHEN is_occupied = 0 THEN 1 ELSE 0 END) as free_ips,
-    (SELECT COUNT(*) FROM subnets) as total_subnets
-    FROM ip_addresses WHERE 1=1`;
-  
+  let whereClause = "WHERE 1=1";
   let params = [];
   
-  if (subnet_id) {
-    query += " AND subnet_id = ?";
-    params.push(subnet_id);
+  if (company_id) {
+    whereClause += " AND s.company_id = ?";
+    params.push(company_id);
   }
   
   if (date_from) {
-    query += " AND created_date >= ?";
+    whereClause += " AND s.created_date >= ?";
     params.push(date_from);
   }
   
   if (date_to) {
-    query += " AND created_date <= ?";
+    whereClause += " AND s.created_date <= ?";
     params.push(date_to + ' 23:59:59');
   }
-  
-  db.get(query, params, (err, stats) => {
+
+  // Получаем общую статистику с фильтрами
+  db.get(`SELECT COUNT(*) as total_subnets FROM subnets s ${whereClause}`, params, (err, totalResult) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
     
-    res.json(stats || { total_ips: 0, occupied_ips: 0, free_ips: 0, total_subnets: 0 });
+    // Получаем количество свободных подсетей (только с company_id = NULL)
+    let freeParams = [...params];
+    let freeWhere = whereClause + " AND s.company_id IS NULL";
+    
+    db.get(`SELECT COUNT(*) as free_subnets FROM subnets s ${freeWhere}`, freeParams, (err, freeResult) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      
+      // Получаем распределение VLAN
+      db.all(`SELECT 
+        COALESCE(s.vlan, 'Brak') as vlan, 
+        COUNT(*) as count 
+        FROM subnets s ${whereClause} 
+        GROUP BY s.vlan 
+        ORDER BY count DESC`, params, (err, vlanResult) => {
+        if (err) {
+          res.status(500).json({ error: err.message });
+          return;
+        }
+        
+        const total_subnets = totalResult.total_subnets || 0;
+        const free_subnets = freeResult.free_subnets || 0;
+        const assigned_subnets = total_subnets - free_subnets;
+        
+        // Получаем количество компаний (исключая технические)
+        db.get(`SELECT COUNT(*) as total_companies FROM companies WHERE name != 'Wolne'`, (err, companiesResult) => {
+          if (err) {
+            res.status(500).json({ error: err.message });
+            return;
+          }
+          
+          res.json({
+            total_subnets,
+            free_subnets,
+            assigned_subnets,
+            total_companies: companiesResult.total_companies || 0,
+            vlan_distribution: vlanResult || []
+          });
+        });
+      });
+    });
   });
 });
 
-// Аналитика - IP адреса по подсетям
-app.get('/api/analytics/subnets', requireAuth, (req, res) => {
+// Аналитика - podsieci według firm
+app.get('/api/analytics/companies', requireAuth, (req, res) => {
   const { date_from, date_to } = req.query;
   
   let query = `SELECT 
-    s.network,
-    s.mask,
-    COUNT(ip.id) as ip_count,
-    SUM(CASE WHEN ip.is_occupied = 1 THEN 1 ELSE 0 END) as occupied_count,
-    SUM(CASE WHEN ip.is_occupied = 0 THEN 1 ELSE 0 END) as free_count
+    COALESCE(c.name, 'Wolne') as company,
+    COUNT(s.id) as subnet_count,
+    c.id as company_id
     FROM subnets s
-    LEFT JOIN ip_addresses ip ON s.id = ip.subnet_id`;
-  
-  let params = [];
-  
-  if (date_from || date_to) {
-    query += " AND (ip.id IS NULL";
-    if (date_from) {
-      query += " OR ip.created_date >= ?";
-      params.push(date_from);
-    }
-    if (date_to) {
-      query += " OR ip.created_date <= ?";
-      params.push(date_to + ' 23:59:59');
-    }
-    query += ")";
-  }
-  
-  query += " GROUP BY s.id, s.network, s.mask ORDER BY ip_count DESC LIMIT 10";
-  
-  db.all(query, params, (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    res.json(rows);
-  });
-});
-
-// Аналитика - компании по использованию IP
-app.get('/api/analytics/companies', requireAuth, (req, res) => {
-  const { subnet_id, date_from, date_to } = req.query;
-  
-  let query = `SELECT 
-    COALESCE(company_name, 'Без компании') as company,
-    COUNT(*) as ip_count
-    FROM ip_addresses 
+    LEFT JOIN companies c ON s.company_id = c.id
     WHERE 1=1`;
   
   let params = [];
   
-  if (subnet_id) {
-    query += " AND subnet_id = ?";
-    params.push(subnet_id);
-  }
-  
   if (date_from) {
-    query += " AND created_date >= ?";
+    query += " AND s.created_date >= ?";
     params.push(date_from);
   }
   
   if (date_to) {
-    query += " AND created_date <= ?";
+    query += " AND s.created_date <= ?";
     params.push(date_to + ' 23:59:59');
   }
   
-  query += " GROUP BY company_name ORDER BY ip_count DESC LIMIT 10";
+  query += " GROUP BY c.id, c.name ORDER BY subnet_count DESC LIMIT 10";
   
   db.all(query, params, (err, rows) => {
     if (err) {
@@ -922,24 +1179,24 @@ app.get('/api/analytics/companies', requireAuth, (req, res) => {
   });
 });
 
-// Аналитика - активность по месяцам
+// Аналитика - aktywność podsieci według miesięcy
 app.get('/api/analytics/monthly', requireAuth, (req, res) => {
-  const { subnet_id } = req.query;
+  const { company_id } = req.query;
   
   let query = `SELECT 
-    strftime('%Y-%m', created_date) as month,
+    strftime('%Y-%m', s.created_date) as month,
     COUNT(*) as count
-    FROM ip_addresses 
-    WHERE created_date >= date('now', '-12 months')`;
+    FROM subnets s
+    WHERE s.created_date >= date('now', '-12 months')`;
   
   let params = [];
   
-  if (subnet_id) {
-    query += " AND subnet_id = ?";
-    params.push(subnet_id);
+  if (company_id) {
+    query += " AND s.company_id = ?";
+    params.push(company_id);
   }
   
-  query += " GROUP BY strftime('%Y-%m', created_date) ORDER BY month";
+  query += " GROUP BY strftime('%Y-%m', s.created_date) ORDER BY month";
   
   db.all(query, params, (err, rows) => {
     if (err) {
@@ -969,6 +1226,36 @@ app.get('/api/analytics/utilization', requireAuth, (req, res) => {
       return;
     }
     res.json(rows);
+  });
+});
+
+// Import firm z Excel
+// Eksport firm do Excel
+app.get('/api/export-companies-excel', requireAuth, (req, res) => {
+  const query = `
+    SELECT name, description, created_date
+    FROM companies 
+    WHERE name != 'Wolne'
+    ORDER BY name
+  `;
+  
+  db.all(query, (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Firmy');
+    
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    
+    res.setHeader('Content-Disposition', 'attachment; filename=firmy.xlsx');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buffer);
+    
+    logAudit(req, 'EXPORT_COMPANIES_EXCEL', 'company', null, null, { rows_count: rows.length });
   });
 });
 
