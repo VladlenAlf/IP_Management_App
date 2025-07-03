@@ -84,8 +84,8 @@ db.serialize(() => {
     created_date DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  // Dodawanie domyślnych firm
-  db.run(`INSERT OR IGNORE INTO companies (name, description) VALUES ('Wolne', 'Nieprzypisane podsieci')`);
+  // Dodawanie domyślnych firm z гарантированными ID
+  db.run(`INSERT OR IGNORE INTO companies (id, name, description) VALUES (1, 'Wolne', 'Nieprzypisane podsieci')`);
 
   // Tabela podsieci (nowa struktura)
   db.run(`CREATE TABLE IF NOT EXISTS subnets (
@@ -297,6 +297,11 @@ app.put('/api/companies/:id', requireAuth, (req, res) => {
   const { name, description } = req.body;
   
   // Проверяем, что это не системная компания
+  if (parseInt(id) <= 2) {
+    res.status(400).json({ error: 'Nie można edytować firmy systemowej' });
+    return;
+  }
+  
   db.get("SELECT name FROM companies WHERE id = ?", [id], (err, company) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -333,6 +338,11 @@ app.delete('/api/companies/:id', requireAuth, (req, res) => {
   const { id } = req.params;
   
   // Sprawdzamy, czy to nie firma systemowa
+  if (parseInt(id) <= 2) {
+    res.status(400).json({ error: 'Nie można usunąć firmy systemowej' });
+    return;
+  }
+  
   db.get("SELECT name FROM companies WHERE id = ?", [id], (err, company) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -676,8 +686,8 @@ app.post('/api/subnets/assign-free', requireAuth, (req, res) => {
       return;
     }
     
-    // Znajdźemy wszystkie podsieci bez przypisanej firmy (company_id IS NULL lub company_id = 2 "Wolne")
-    db.all("SELECT * FROM subnets WHERE company_id IS NULL OR company_id = 2", (err, freeSubnets) => {
+    // Znajdźemy wszystkie podsieci bez przypisanej firmy (company_id IS NULL lub company_id = 1 "Wolne")
+    db.all("SELECT * FROM subnets WHERE company_id IS NULL OR company_id = 1", (err, freeSubnets) => {
       if (err) {
         res.status(500).json({ error: err.message });
         return;
@@ -818,6 +828,11 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
       }
       
       const normalizedName = companyName.trim();
+      
+      // Защита системных компаний от перезаписи
+      if (companyId <= 2) {
+        return callback(new Error(`Nie można modyfikować systemowej firmy (ID: ${companyId})`), null);
+      }
       
       // Проверяем, существует ли уже компания с таким ID
       db.get("SELECT id, name FROM companies WHERE id = ?", [companyId], (err, row) => {
@@ -1106,7 +1121,7 @@ app.get('/api/stats', requireAuth, (req, res) => {
     }
     
     // Получаем количество свободных подсетей (company_id = 2 или NULL)
-    db.get(`SELECT COUNT(*) as free_subnets FROM subnets WHERE company_id = 2 OR company_id IS NULL`, (err, freeResult) => {
+    db.get(`SELECT COUNT(*) as free_subnets FROM subnets WHERE company_id = 1 OR company_id IS NULL`, (err, freeResult) => {
       if (err) {
         res.status(500).json({ error: err.message });
         return;

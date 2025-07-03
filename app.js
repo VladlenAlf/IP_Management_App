@@ -1091,9 +1091,9 @@ function renderCompaniesTable() {
         // Подсчитываем количество подсетей для каждой компании
         let subnetCount;
         if (company.name === 'Wolne') {
-            // Для компании "Wolне" считаем подсети с company_id = NULL (неназначенные)
+            // Для компании "Wolne" считаем подсети с company_id = NULL или company_id = 1
             subnetCount = subnets.filter(subnet => 
-                subnet.company_id === null
+                subnet.company_id === null || subnet.company_id === 1
             ).length;
         } else {
             subnetCount = subnets.filter(subnet => subnet.company_id === company.id).length;
