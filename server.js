@@ -772,8 +772,8 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
     // Кэш компаний для избежания дублирования запросов
     const companyCache = new Map();
 
-    // Функция для получения или создания компании
-    const getOrCreateCompany = (companyName, callback) => {
+    // Функция для получения или создания компании по имени
+    const getOrCreateCompanyByName = (companyName, callback) => {
       if (!companyName || companyName.trim() === '') {
         return callback(null, null);
       }
@@ -811,6 +811,53 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
       });
     };
 
+    // Функция для создания компании с определенным ID
+    const createCompanyWithId = (companyId, companyName, callback) => {
+      if (!companyName || companyName.trim() === '') {
+        return callback(null, companyId);
+      }
+      
+      const normalizedName = companyName.trim();
+      
+      // Проверяем, существует ли уже компания с таким ID
+      db.get("SELECT id, name FROM companies WHERE id = ?", [companyId], (err, row) => {
+        if (err) {
+          return callback(err, null);
+        }
+        
+        if (row) {
+          // Компания с таким ID уже существует
+          if (row.name !== normalizedName) {
+            // Обновляем название, если оно отличается
+            db.run("UPDATE companies SET name = ?, description = ? WHERE id = ?", 
+              [normalizedName, `Firma zaktualizowana podczas importu`, companyId], 
+              (updateErr) => {
+                if (updateErr) {
+                  return callback(updateErr, null);
+                }
+                companyCache.set(normalizedName, companyId);
+                callback(null, companyId);
+              });
+          } else {
+            companyCache.set(normalizedName, companyId);
+            callback(null, companyId);
+          }
+        } else {
+          // Создаем новую компанию с определенным ID
+          db.run("INSERT INTO companies (id, name, description) VALUES (?, ?, ?)", 
+            [companyId, normalizedName, `Firma utworzona podczas importu`], 
+            function(insertErr) {
+              if (insertErr) {
+                return callback(insertErr, null);
+              }
+              companiesCreated++;
+              companyCache.set(normalizedName, companyId);
+              callback(null, companyId);
+            });
+        }
+      });
+    };
+
     // Обрабатываем каждую строку
     let processedRows = 0;
     const totalRows = data.length;
@@ -820,6 +867,8 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
       const network = row.network || row['Sieć'];
       const mask = row.mask || row['Maska'];
       const company = row.company || row['Firma'] || row.company_name;
+      const company_id = row.company_id;
+      const name = row.name;
       const vlan = row.vlan || row['VLAN'];
       const description = row.description || row['Opis'];
       
@@ -832,7 +881,24 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
         return;
       }
 
-      getOrCreateCompany(company, (err, companyId) => {
+      // Определяем способ обработки компании
+      let companyHandler;
+      
+      if (company_id && name) {
+        // Если указаны и company_id, и name - создаем/обновляем компанию с конкретным ID
+        companyHandler = (callback) => createCompanyWithId(parseInt(company_id), name, callback);
+      } else if (company) {
+        // Если указана только company (старый формат) - создаем компанию с автоматическим ID
+        companyHandler = (callback) => getOrCreateCompanyByName(company, callback);
+      } else if (company_id) {
+        // Если указан только company_id - используем существующую компанию
+        companyHandler = (callback) => callback(null, parseInt(company_id));
+      } else {
+        // Если ничего не указано - подсеть будет свободной
+        companyHandler = (callback) => callback(null, null);
+      }
+
+      companyHandler((err, finalCompanyId) => {
         if (err) {
           errors.push(`Wiersz ${index + 1}: Błąd firmy: ${err.message}`);
           processedRows++;
@@ -845,7 +911,7 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
         db.run(`INSERT OR IGNORE INTO subnets 
                 (network, mask, company_id, vlan, description) 
                 VALUES (?, ?, ?, ?, ?)`,
-          [network, parseInt(mask), companyId, vlan || null, description || ''],
+          [network, parseInt(mask), finalCompanyId, vlan || null, description || ''],
           function(insertErr) {
             if (insertErr) {
               errors.push(`Wiersz ${index + 1}: ${insertErr.message}`);
@@ -901,7 +967,7 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
 // Eksport podsieci do Excel
 app.get('/api/export-excel', requireAuth, (req, res) => {
   const query = `
-    SELECT s.network, s.mask, s.vlan, s.description, s.created_date,
+    SELECT s.network, s.mask, s.company_id, s.vlan, s.description, s.created_date,
            c.name as company_name
     FROM subnets s 
     LEFT JOIN companies c ON s.company_id = c.id 
@@ -917,12 +983,12 @@ app.get('/api/export-excel', requireAuth, (req, res) => {
     try {
       // Konwertujemy dane do formatu Excel
       const exportData = rows.map(row => ({
-        'Sieć': row.network,
-        'Maska': row.mask,
-        'VLAN': row.vlan || '',
-        'Firma': row.company_name || 'Wolne',
-        'Opis': row.description || '',
-        'Data utworzenia': row.created_date
+        'network': row.network,
+        'mask': row.mask,
+        'company_id': row.company_id || '',
+        'vlan': row.vlan || '',
+        'description': row.description || '',
+        'name': row.company_name || ''
       }));
       
       const workbook = XLSX.utils.book_new();

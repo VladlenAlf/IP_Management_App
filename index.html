@@ -114,18 +114,9 @@
                     <button class="btn btn-primary" onclick="importExcel()">Importuj podsieci</button>
                 </div>
                 <div class="import-info">
-                    <p>Obsługiwane kolumny: network, mask, company_id, vlan, description</p>
-                    <p>Przykład: 192.168.1.0, 24, 1, 100, Sieć biurowa</p>
-                </div>
-                
-                <h3>Import firm z Excel</h3>
-                <div class="file-upload">
-                    <input type="file" id="companiesExcelFile" accept=".xlsx,.xls" onchange="handleCompaniesFileSelect()">
-                    <button class="btn btn-primary" onclick="importCompaniesExcel()">Importuj firmy</button>
-                </div>
-                <div class="import-info">
-                    <p>Obsługiwane kolumny: name, description</p>
-                    <p>Przykład: ACME Corp, Firma produkcyjna</p>
+                    <p>Obsługiwane kolumny: network, mask, company_id, vlan, description, name</p>
+                    <p>Przykład: 192.168.1.0, 24, 1, 100, Sieć biurowa, WSPA</p>
+                    <p><strong>Uwaga:</strong> Jeśli podasz 'name', firma zostanie utworzona automatycznie i przypisana do podsieci z tym company_id</p>
                 </div>
                 
                 <h3>Eksport do Excel</h3>
