@@ -56,14 +56,22 @@ const API = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(companyData)
         });
-        return response.json();
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Błąd tworzenia firmy');
+        }
+        return result;
     },
 
     async deleteCompany(id) {
         const response = await fetch(`/api/companies/${id}`, {
             method: 'DELETE'
         });
-        return response.json();
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Błąd usuwania firmy');
+        }
+        return result;
     },
 
     async updateSubnet(id, subnetData) {
@@ -185,9 +193,38 @@ const API = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(companyData)
         });
-        return response.json();
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Błąd aktualizacji firmy');
+        }
+        return result;
     }
 };
+
+// Funkcje globalne dla zarządzania firmami
+async function deleteCompany(id) {
+    const company = companies.find(c => c.id === id);
+    if (!company) return;
+    
+    // Защита системной фирмы "Wolne"
+    if (company.name === 'Wolne' || id === 1) {
+        showMessage('Nie można usunąć firmy systemowej "Wolne"', 'error');
+        return;
+    }
+    
+    if (!confirm(`Czy na pewno chcesz usunąć firmę "${company.name}"?`)) return;
+    
+    try {
+        await API.deleteCompany(id);
+        showMessage('Firma została pomyślnie usunięta', 'success');
+        await loadCompanies();
+        await loadSubnets();
+        await loadStats();
+    } catch (error) {
+        console.error('Błąd podczas usuwania firmy:', error);
+        showMessage(error.message || 'Błąd podczas usuwania firmy', 'error');
+    }
+}
 
 // Inicjalizacja aplikacji
 document.addEventListener('DOMContentLoaded', function() {
@@ -618,7 +655,7 @@ function updateCompanyOptions() {
         }
         
         companies.forEach(company => {
-            if (company.name !== 'Wolne') { // Не показываем "Wolne" как опцию
+            if (company.name !== 'Wolne') { // Не показываем "Wолне" как опцию
                 const option = document.createElement('option');
                 option.value = company.id;
                 option.textContent = company.name;
@@ -779,7 +816,8 @@ function setupEventListeners() {
                 updateCompanyOptions();
                 loadStats();
             } catch (error) {
-                showMessage('Błąd podczas zapisywania firmy', 'error');
+                console.error('Błąd podczas zapisywania firmy:', error);
+                showMessage(error.message || 'Błąд podczas zapisywania firmy', 'error');
             }
         });
     }
@@ -954,7 +992,7 @@ async function importCompaniesExcel() {
         loadCompanies();
         fileInput.value = '';
     } catch (error) {
-        console.error('Błąd importu фирм:', error);
+        console.error('Błąд импортa фирм:', error);
         showMessage('Błąd podczas importu фирм', 'error');
     }
 }
@@ -1000,56 +1038,7 @@ function calculateBroadcast(network, mask) {
     return parts.join('.');
 }
 
-// Отображение таблицы IP адресов
-function renderIpTable() {
-    const tbody = document.querySelector('#ipTable tbody');
-    tbody.innerHTML = '';
-
-    // Сортируем IP адреса для правильного отображения
-    const sortedIps = ipAddresses.sort((a, b) => {
-        const ipA = a.ip_address.split('.').map(num => parseInt(num));
-        const ipB = b.ip_address.split('.').map(num => parseInt(num));
-        
-        for (let i = 0; i < 4; i++) {
-            if (ipA[i] !== ipB[i]) {
-                return ipA[i] - ipB[i];
-            }
-        }
-        return 0;
-    });
-
-    sortedIps.forEach(ip => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${ip.ip_address}</td>
-            <td>${ip.network ? `${ip.network}/${ip.mask}` : '-'}</td>
-            <td>${ip.company_name || '-'}</td>
-            <td>${ip.assigned_date || '-'}</td>
-            <td>
-                <span class="status-badge ${ip.is_occupied ? 'status-occupied' : 'status-free'}">
-                    ${ip.is_occupied ? 'Zajęty' : 'Wolny'}
-                </span>
-            </td>
-            <td>${ip.description || '-'}</td>
-            <td>
-                <button class="btn btn-small btn-primary" onclick="editIp(${ip.id})">Edytuj</button>
-                <button class="btn btn-small btn-danger" onclick="deleteIp(${ip.id})">Usuń</button>
-            </td>
-        `;
-        tbody.appendChild(row);
-    });
-
-    // Показываем сообщение если нет IP адресов
-    if (sortedIps.length === 0) {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td colspan="7" style="text-align: center; color: #7f8c8d; padding: 40px;">
-                Brak adresów IP do wyświetlenia
-            </td>
-        `;
-        tbody.appendChild(row);
-    }
-}
+// Функция удалена - больше не работаем с IP-адресами
 
 // Отображение таблицы подсетей
 function renderSubnetsTable() {
@@ -1091,12 +1080,14 @@ function renderCompaniesTable() {
         // Подсчитываем количество подсетей для каждой компании
         let subnetCount;
         if (company.name === 'Wolne') {
-            // Для компании "Wolne" считаем подсети с company_id = NULL или company_id = 1
+            // Для компании "Wolне" считаем подсети с company_id = NULL или company_id = 1
             subnetCount = subnets.filter(subnet => 
                 subnet.company_id === null || subnet.company_id === 1
             ).length;
         } else {
-            subnetCount = subnets.filter(subnet => subnet.company_id === company.id).length;
+            subnetCount = subnets.filter(subnet => {
+                return parseInt(subnet.company_id) === parseInt(company.id);
+            }).length;
         }
         
         const row = document.createElement('tr');
@@ -1133,15 +1124,26 @@ function renderLogsTable(logs) {
             'LOGIN_FAILED': 'Nieudane logowanie',
             'LOGOUT': 'Wylogowanie z systemu',
             'CREATE_SUBNET': 'Tworzenie podsieci',
-            'UPDATE_SUBNET': 'Модификация подсети',
+            'CREATE_SUBNET_FAILED': 'Błąd tworzenia podsieci',
+            'UPDATE_SUBNET': 'Modyfikacja подсети',
+            'UPDATE_SUBNET_FAILED': 'Błąд мodyfikacji подсети',
             'DELETE_SUBNET': 'Usuwanie подсети',
-            'DIVIDE_SUBNET': 'Podział подсети',
-            'MERGE_SUBNETS': 'Łączenie подсетей',
-            'ASSIGN_SUBNETS': 'Przypisanie подсетей',
+            'DELETE_SUBNET_FAILED': 'Błąд usuwania подсети',
+            'DIVIDE_SUBNET': 'Podział podsieci',
+            'MERGE_SUBNETS': 'Łączenie podsieci',
+            'ASSIGN_SUBNETS': 'Przypisanie podsieci',
+            'ASSIGN_FREE_SUBNETS': 'Przypisanie wolnych podsieci',
+            'ASSIGN_FREE_SUBNETS_FAILED': 'Błąd przypisania wolnych podsieci',
             'CREATE_COMPANY': 'Tworzenie firmy',
+            'CREATE_COMPANY_FAILED': 'Błąd tworzenia firmy',
+            'UPDATE_COMPANY': 'Modyfikacja firmy',
+            'UPDATE_COMPANY_FAILED': 'Błąd modyfikacji firmy',
             'DELETE_COMPANY': 'Usuwanie firmy',
+            'DELETE_COMPANY_FAILED': 'Błąd usuwania firmy',
             'IMPORT_EXCEL': 'Import z Excel',
-            'EXPORT_EXCEL': 'Eksport do Excel'
+            'IMPORT_EXCEL_FAILED': 'Błąd importu z Excel',
+            'EXPORT_EXCEL': 'Eksport do Excel',
+            'EXPORT_EXCEL_FAILED': 'Błąd eksportu do Excel'
         };
         
         const entityMap = {
@@ -1254,19 +1256,32 @@ async function showLogDetails(logId) {
             'LOGIN_FAILED': 'Nieudane logowanie',
             'LOGOUT': 'Wylogowanie z systemu',
             'CREATE_SUBNET': 'Tworzenie podsieci',
-            'UPDATE_SUBNET': 'Модификация подсети',
+            'CREATE_SUBNET_FAILED': 'Błąd tworzenia podsieci',
+            'UPDATE_SUBNET': 'Modyfikacja подсети',
+            'UPDATE_SUBNET_FAILED': 'Błąд мodyfikacji подсети',
             'DELETE_SUBNET': 'Usuwanie подсети',
-            'CREATE_IP': 'Tworzenie IP',
-            'UPDATE_IP': 'Модификация IP',
-            'DELETE_IP': 'Usувание IP',
-            'BULK_CREATE_IP': 'Masowe tworzenie IP',
-            'IMPORT_EXCEL': 'Import z Excel'
+            'DELETE_SUBNET_FAILED': 'Błąд usuwania подсети',
+            'DIVIDE_SUBNET': 'Podział podsieci',
+            'MERGE_SUBNETS': 'Łączenie podsieci',
+            'ASSIGN_SUBNETS': 'Przypisanie podsieci',
+            'ASSIGN_FREE_SUBNETS': 'Przypisanie wolnych podsieci',
+            'ASSIGN_FREE_SUBNETS_FAILED': 'Błąd przypisania wolnych podsieci',
+            'CREATE_COMPANY': 'Tworzenie firmy',
+            'CREATE_COMPANY_FAILED': 'Błąd tworzenia firmy',
+            'UPDATE_COMPANY': 'Modyfikacja firmy',
+            'UPDATE_COMPANY_FAILED': 'Błąd modyfikacji firmy',
+            'DELETE_COMPANY': 'Usuwanie firmy',
+            'DELETE_COMPANY_FAILED': 'Błąd usuwania firmy',
+            'IMPORT_EXCEL': 'Import z Excel',
+            'IMPORT_EXCEL_FAILED': 'Błąd importu z Excel',
+            'EXPORT_EXCEL': 'Eksport do Excel',
+            'EXPORT_EXCEL_FAILED': 'Błąd eksportu do Excel'
         };
         
         const entityMap = {
             'user': 'Użytkownik',
             'subnet': 'Podsieć',
-            'ip_address': 'Adres IP'
+            'company': 'Firma'
         };
         
         document.getElementById('logDetailAction').textContent = actionMap[log.action] || log.action;
@@ -1319,12 +1334,10 @@ async function showLogDetails(logId) {
 // Обновление фильтров подсетей
 function updateSubnetFilters() {
     const subnetFilter = document.getElementById('subnetFilter');
-    const ipSubnet = document.getElementById('ipSubnet');
     const analyticsSubnetFilter = document.getElementById('analyticsSubnetFilter');
     
     // Очистка существующих опций
     if (subnetFilter) subnetFilter.innerHTML = '<option value="">Wszystkie podsieci</option>';
-    if (ipSubnet) ipSubnet.innerHTML = '<option value="">Bez podsieci</option>';
     if (analyticsSubnetFilter) analyticsSubnetFilter.innerHTML = '<option value="">Wszystkie podsieci</option>';
     
     subnets.forEach(subnet => {
@@ -1333,28 +1346,11 @@ function updateSubnetFilters() {
         option.textContent = `${subnet.network}/${subnet.mask}`;
         
         if (subnetFilter) subnetFilter.appendChild(option.cloneNode(true));
-        if (ipSubnet) ipSubnet.appendChild(option.cloneNode(true));
         if (analyticsSubnetFilter) analyticsSubnetFilter.appendChild(option.cloneNode(true));
     });
-    
-    // Также обновляем опции для массового добавления и удаления
-    updateBulkSubnetOptions();
-    updateDeleteSubnetOptions();
 }
 
-// Удаление IP
-async function deleteIp(id) {
-    if (!confirm('Czy na pewno chcesz usunąć ten адрес IP?')) return;
-    
-    try {
-        await API.deleteIpAddress(id);
-        showMessage('Adres IP został pomyślnie usunięty', 'success');
-        loadIpAddresses();
-        loadStats();
-    } catch (error) {
-        showMessage('Błąd podczas usuwania адреса IP', 'error');
-    }
-}
+// Функция удалена - больше не работаем с IP-адресами
 
 // Удаление подсети
 async function deleteSubnet(id) {
@@ -1473,6 +1469,55 @@ function editCompany(id) {
     document.getElementById('companyDescription').value = company.description || '';
     
     document.getElementById('companyModal').style.display = 'block';
+}
+
+// Функция обновления логов
+function refreshLogs() {
+    loadAuditLogs(1, logsFilters);
+}
+
+// Функция фильтрации логов
+function filterLogs() {
+    const actionFilter = document.getElementById('actionFilter')?.value || '';
+    const entityFilter = document.getElementById('entityFilter')?.value || '';
+    const userFilter = document.getElementById('userFilter')?.value || '';
+    const dateFromFilter = document.getElementById('dateFromFilter')?.value || '';
+    const dateToFilter = document.getElementById('dateToFilter')?.value || '';
+    
+    const filters = {};
+    
+    if (actionFilter) {
+        filters.action = actionFilter;
+    }
+    
+    if (entityFilter) {
+        filters.entity_type = entityFilter;
+    }
+    
+    if (userFilter.trim()) {
+        filters.username = userFilter.trim();
+    }
+    
+    if (dateFromFilter) {
+        filters.date_from = dateFromFilter;
+    }
+    
+    if (dateToFilter) {
+        filters.date_to = dateToFilter;
+    }
+    
+    console.log('Применяем фильтры логов:', filters);
+    loadAuditLogs(1, filters);
+}
+
+// Функция очистки фильтров логов
+function clearLogsFilters() {
+    document.getElementById('actionFilter').value = '';
+    document.getElementById('entityFilter').value = '';
+    document.getElementById('userFilter').value = '';
+    document.getElementById('dateFromFilter').value = '';
+    document.getElementById('dateToFilter').value = '';
+    loadAuditLogs(1, {});
 }
 
 // Eksport do Excel

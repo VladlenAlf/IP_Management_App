@@ -206,25 +206,36 @@
                 <div class="filters">
                     <select id="actionFilter" onchange="filterLogs()">
                         <option value="">Wszystkie akcje</option>
-                        <option value="LOGIN">Logowanie</option>
+                        <option value="LOGIN_SUCCESS">Logowanie</option>
+                        <option value="LOGIN_FAILED">Nieudane logowanie</option>
                         <option value="LOGOUT">Wylogowanie</option>
-                        <option value="CREATE">Tworzenie</option>
-                        <option value="UPDATE">Modyfikacja</option>
-                        <option value="DELETE">Usuwanie</option>
-                        <option value="IMPORT">Import</option>
-                        <option value="BULK">Operacje masowe</option>
+                        <option value="CREATE_SUBNET">Tworzenie podsieci</option>
+                        <option value="UPDATE_SUBNET">Modyfikacja podsieci</option>
+                        <option value="DELETE_SUBNET">Usuwanie podsieci</option>
+                        <option value="DIVIDE_SUBNET">Podział podsieci</option>
+                        <option value="MERGE_SUBNETS">Łączenie podsieci</option>
+                        <option value="ASSIGN_FREE_SUBNETS">Przypisanie wolnych podsieci</option>
+                        <option value="CREATE_COMPANY">Tworzenie firmy</option>
+                        <option value="UPDATE_COMPANY">Modyfikacja firmy</option>
+                        <option value="DELETE_COMPANY">Usuwanie firmy</option>
+                        <option value="IMPORT_EXCEL">Import z Excel</option>
+                        <option value="EXPORT_EXCEL">Eksport do Excel</option>
                     </select>
                     
                     <select id="entityFilter" onchange="filterLogs()">
                         <option value="">Wszystkie obiekty</option>
                         <option value="user">Użytkownicy</option>
                         <option value="subnet">Podsieci</option>
-                        <option value="ip_address">Adresy IP</option>
+                        <option value="company">Firmy</option>
                     </select>
                     
                     <input type="text" id="userFilter" placeholder="Użytkownik..." onkeyup="filterLogs()">
                     
+                    <input type="date" id="dateFromFilter" onchange="filterLogs()">
+                    <input type="date" id="dateToFilter" onchange="filterLogs()">
+                    
                     <button class="btn btn-secondary" onclick="refreshLogs()">Odśwież</button>
+                    <button class="btn btn-secondary" onclick="clearLogsFilters()">Wyczyść filtry</button>
                 </div>
             </div>
 

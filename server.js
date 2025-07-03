@@ -296,8 +296,11 @@ app.put('/api/companies/:id', requireAuth, (req, res) => {
   const { id } = req.params;
   const { name, description } = req.body;
   
+  console.log(`PUT /api/companies/${id}:`, { name, description });
+  
   // Проверяем, что это не системная компания
   if (parseInt(id) <= 2) {
+    console.log(`Попытка редактирования системной компании ID: ${id}`);
     res.status(400).json({ error: 'Nie można edytować firmy systemowej' });
     return;
   }
@@ -321,11 +324,13 @@ app.put('/api/companies/:id', requireAuth, (req, res) => {
     db.run("UPDATE companies SET name = ?, description = ? WHERE id = ?",
       [name, description, id], function(err) {
         if (err) {
+          console.log(`Błąд UPDATE компании ${id}:`, err.message);
           logAudit(req, 'UPDATE_COMPANY_FAILED', 'company', id, null, { name, description, error: err.message });
           res.status(500).json({ error: err.message });
           return;
         }
         
+        console.log(`Компания ${id} успешно обновлена:`, { name, description });
         const companyData = { id: parseInt(id), name, description };
         logAudit(req, 'UPDATE_COMPANY', 'company', id, null, companyData);
         res.json(companyData);
@@ -337,8 +342,11 @@ app.put('/api/companies/:id', requireAuth, (req, res) => {
 app.delete('/api/companies/:id', requireAuth, (req, res) => {
   const { id } = req.params;
   
+  console.log(`DELETE /api/companies/${id}`);
+  
   // Sprawdzamy, czy to nie firma systemowa
   if (parseInt(id) <= 2) {
+    console.log(`Попытка удаления системной компании ID: ${id}`);
     res.status(400).json({ error: 'Nie można usunąć firmy systemowej' });
     return;
   }
@@ -1039,7 +1047,7 @@ app.get('/api/export-excel', requireAuth, (req, res) => {
 
 // Pobranie logów audytu
 app.get('/api/audit-logs', requireAuth, (req, res) => {
-  const { page = 1, limit = 50, action, entity_type, username } = req.query;
+  const { page = 1, limit = 50, action, entity_type, username, date_from, date_to } = req.query;
   const offset = (page - 1) * limit;
   
   let query = `SELECT * FROM audit_logs WHERE 1=1`;
@@ -1047,9 +1055,9 @@ app.get('/api/audit-logs', requireAuth, (req, res) => {
   let params = [];
   
   if (action) {
-    query += ` AND action LIKE ?`;
-    countQuery += ` AND action LIKE ?`;
-    params.push(`%${action}%`);
+    query += ` AND action = ?`;
+    countQuery += ` AND action = ?`;
+    params.push(action);
   }
   
   if (entity_type) {
@@ -1062,6 +1070,18 @@ app.get('/api/audit-logs', requireAuth, (req, res) => {
     query += ` AND username LIKE ?`;
     countQuery += ` AND username LIKE ?`;
     params.push(`%${username}%`);
+  }
+  
+  if (date_from) {
+    query += ` AND DATE(created_date) >= ?`;
+    countQuery += ` AND DATE(created_date) >= ?`;
+    params.push(date_from);
+  }
+  
+  if (date_to) {
+    query += ` AND DATE(created_date) <= ?`;
+    countQuery += ` AND DATE(created_date) <= ?`;
+    params.push(date_to);
   }
   
   query += ` ORDER BY created_date DESC LIMIT ? OFFSET ?`;

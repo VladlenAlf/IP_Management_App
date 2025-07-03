@@ -145,8 +145,10 @@ header {
 
 .filters {
     display: flex;
-    gap: 10px;
     flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 20px;
 }
 
 /* Przyciski */
@@ -432,14 +434,26 @@ textarea {
 .action-login_failed { background: #f8d7da; color: #721c24; }
 .action-logout { background: #e2e3e5; color: #383d41; }
 .action-create_subnet,
-.action-create_ip { background: #d1ecf1; color: #0c5460; }
+.action-create_company { background: #d1ecf1; color: #0c5460; }
 .action-update_subnet,
-.action-update_ip { background: #fff3cd; color: #856404; }
+.action-update_company { background: #fff3cd; color: #856404; }
 .action-delete_subnet,
-.action-delete_ip { background: #f8d7da; color: #721c24; }
-.action-bulk_create_ip,
-.action-bulk_delete_ip,
-.action-import_excel { background: #d1e7dd; color: #0f5132; }
+.action-delete_company { background: #f8d7da; color: #721c24; }
+.action-divide_subnet { background: #e7d4f1; color: #5a2d6b; }
+.action-merge_subnets { background: #fce4ec; color: #ad1457; }
+.action-assign_subnets,
+.action-assign_free_subnets { background: #e8f5e8; color: #2e7d32; }
+.action-import_excel,
+.action-export_excel { background: #d1e7dd; color: #0f5132; }
+.action-create_subnet_failed,
+.action-create_company_failed,
+.action-update_subnet_failed,
+.action-update_company_failed,
+.action-delete_subnet_failed,
+.action-delete_company_failed,
+.action-assign_free_subnets_failed,
+.action-import_excel_failed,
+.action-export_excel_failed { background: #f8d7da; color: #721c24; }
 
 .pagination {
     margin-top: 20px;
@@ -690,4 +704,26 @@ textarea {
     .stats-mini {
         grid-template-columns: 1fr;
     }
+}
+
+/* Стили для фильтров логов */
+#dateFromFilter,
+#dateToFilter {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    margin: 0 5px;
+}
+
+.filters input[type="date"] {
+    min-width: 150px;
+}
+
+.filters input[type="text"] {
+    min-width: 150px;
+}
+
+.filters select {
+    min-width: 150px;
 }
