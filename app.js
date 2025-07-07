@@ -817,7 +817,7 @@ function setupEventListeners() {
                 loadStats();
             } catch (error) {
                 console.error('Błąd podczas zapisywania firmy:', error);
-                showMessage(error.message || 'Błąд podczas zapisywania firmy', 'error');
+                showMessage(error.message || 'Błąd podczas zapisywania firmy', 'error');
             }
         });
     }
@@ -877,7 +877,7 @@ function setupEventListeners() {
                     loadStats();
                 }
             } catch (error) {
-                showMessage('Błąd podczas łącения подсети', 'error');
+                showMessage('Błąd podczas łączenia podsieci', 'error');
             }
         });
     }
@@ -907,6 +907,63 @@ function setupEventListeners() {
                 }
             } catch (error) {
                 showMessage('Błąd podczas przypisywania podsieci', 'error');
+            }
+        });
+    }
+    
+    // IP Calculator event listeners
+    const calcIpInput = document.getElementById('calcIpAddress');
+    const calcMaskSelect = document.getElementById('calcSubnetMask');
+    const calcMaskCustom = document.getElementById('calcSubnetMaskCustom');
+    
+    if (calcIpInput) {
+        calcIpInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                calculateNetwork();
+            }
+        });
+        
+        // Remove error styling when user starts typing
+        calcIpInput.addEventListener('input', function() {
+            this.classList.remove('error');
+            hideError('calculatorError');
+        });
+    }
+    
+    if (calcMaskSelect) {
+        calcMaskSelect.addEventListener('change', function() {
+            this.classList.remove('error');
+            hideError('calculatorError');
+            
+            // Clear custom mask when select is used
+            if (this.value && calcMaskCustom) {
+                calcMaskCustom.value = '';
+                calcMaskCustom.classList.remove('error');
+            }
+        });
+        
+        calcMaskSelect.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                calculateNetwork();
+            }
+        });
+    }
+    
+    if (calcMaskCustom) {
+        calcMaskCustom.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                calculateNetwork();
+            }
+        });
+        
+        calcMaskCustom.addEventListener('input', function() {
+            this.classList.remove('error');
+            hideError('calculatorError');
+            
+            // Clear select when custom mask is used
+            if (this.value && calcMaskSelect) {
+                calcMaskSelect.value = '';
+                calcMaskSelect.classList.remove('error');
             }
         });
     }
@@ -985,14 +1042,14 @@ async function importCompaniesExcel() {
         
         if (result.errors && result.errors.length > 0) {
             console.warn('Błędy importu фирм:', result.errors);
-            showMessage(`Import zakończony z ${result.errors.length} błędami. Sprawdź консоль.`, 'warning');
+            showMessage(`Import zakończony z ${result.errors.length} błędami. Sprawdź konsolę.`, 'warning');
         }
         
         // Odświeżamy listę firm
         loadCompanies();
         fileInput.value = '';
     } catch (error) {
-        console.error('Błąд импортa фирм:', error);
+        console.error('Błąd importu фирм:', error);
         showMessage('Błąd podczas importu фирм', 'error');
     }
 }
@@ -1125,11 +1182,11 @@ function renderLogsTable(logs) {
             'LOGOUT': 'Wylogowanie z systemu',
             'CREATE_SUBNET': 'Tworzenie podsieci',
             'CREATE_SUBNET_FAILED': 'Błąd tworzenia podsieci',
-            'UPDATE_SUBNET': 'Modyfikacja подсети',
+            'UPDATE_SUBNET': 'Modyfikacja podsieci',
             'UPDATE_SUBNET_FAILED': 'Błąд мodyfikacji подсети',
-            'DELETE_SUBNET': 'Usuwanie подсети',
-            'DELETE_SUBNET_FAILED': 'Błąд usuwania подсети',
-            'DIVIDE_SUBNET': 'Podział podsieci',
+            'DELETE_SUBNET': 'Usuwanie podsieci',
+            'DELETE_SUBNET_FAILED': 'Błąd usuwania podsieci',
+            'DIVIDE_SUBNET': 'Поделить подсеть',
             'MERGE_SUBNETS': 'Łączenie podsieci',
             'ASSIGN_SUBNETS': 'Przypisanie podsieci',
             'ASSIGN_FREE_SUBNETS': 'Przypisanie wolnych podsieci',
@@ -1257,11 +1314,11 @@ async function showLogDetails(logId) {
             'LOGOUT': 'Wylogowanie z systemu',
             'CREATE_SUBNET': 'Tworzenie podsieci',
             'CREATE_SUBNET_FAILED': 'Błąd tworzenia podsieci',
-            'UPDATE_SUBNET': 'Modyfikacja подсети',
+            'UPDATE_SUBNET': 'Modyfikacja podsieci',
             'UPDATE_SUBNET_FAILED': 'Błąд мodyfikacji подсети',
-            'DELETE_SUBNET': 'Usuwanie подсети',
-            'DELETE_SUBNET_FAILED': 'Błąд usuwania подсети',
-            'DIVIDE_SUBNET': 'Podział podsieci',
+            'DELETE_SUBNET': 'Usuwanie podsieci',
+            'DELETE_SUBNET_FAILED': 'Błąd usuwania podsieci',
+            'DIVIDE_SUBNET': 'Поделить подсеть',
             'MERGE_SUBNETS': 'Łączenie podsieci',
             'ASSIGN_SUBNETS': 'Przypisanie podsieci',
             'ASSIGN_FREE_SUBNETS': 'Przypisanie wolnych podsieci',
@@ -1364,7 +1421,7 @@ async function deleteSubnet(id) {
         loadSubnets();
         loadStats();
     } catch (error) {
-        showMessage('Błąд во время удаления подсети', 'error');
+        showMessage('Błąd podczas usuwania подсети', 'error');
     }
 }
 
@@ -1541,7 +1598,260 @@ async function exportExcel() {
         
         showMessage('Plik został pobrany pomyślnie', 'success');
     } catch (error) {
-        console.error('Błąд экспорта:', error);
+        console.error('Błąd eksportu:', error);
         showMessage('Błąd podczas eksportu danych', 'error');
     }
+}
+
+// ==========================================
+// IP CALCULATOR FUNCTIONS
+// ==========================================
+
+// Validate IP address format
+function isValidIP(ip) {
+    const ipRegex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const match = ip.match(ipRegex);
+    
+    if (!match) return false;
+    
+    for (let i = 1; i <= 4; i++) {
+        const octet = parseInt(match[i]);
+        if (octet < 0 || octet > 255) return false;
+    }
+    
+    return true;
+}
+
+// Convert IP address to 32-bit integer
+function ipToInt(ip) {
+    const parts = ip.split('.');
+    return (parseInt(parts[0]) << 24) + 
+           (parseInt(parts[1]) << 16) + 
+           (parseInt(parts[2]) << 8) + 
+           parseInt(parts[3]);
+}
+
+// Convert 32-bit integer to IP address
+function intToIp(int) {
+    return [
+        (int >>> 24) & 0xFF,
+        (int >>> 16) & 0xFF,
+        (int >>> 8) & 0xFF,
+        int & 0xFF
+    ].join('.');
+}
+
+// Convert subnet mask in dotted decimal format to CIDR
+function subnetMaskToCidr(mask) {
+    if (!isValidIP(mask)) return null;
+    
+    const maskInt = ipToInt(mask);
+    
+    // Check if it's a valid subnet mask (must be contiguous 1s followed by 0s)
+    const invMask = (~maskInt >>> 0);
+    if ((invMask & (invMask + 1)) !== 0) return null;
+    
+    // Count leading ones
+    let cidr = 0;
+    let temp = maskInt >>> 0;
+    while (temp & 0x80000000) {
+        cidr++;
+        temp <<= 1;
+    }
+    
+    return cidr;
+}
+
+// Get subnet mask in dotted decimal format
+function cidrToSubnetMask(cidr) {
+    const mask = 0xFFFFFFFF << (32 - cidr);
+    return intToIp(mask >>> 0);
+}
+
+// Get network class based on first octet
+function getNetworkClass(ip) {
+    const firstOctet = parseInt(ip.split('.')[0]);
+    
+    if (firstOctet >= 1 && firstOctet <= 126) return 'A';
+    if (firstOctet >= 128 && firstOctet <= 191) return 'B';
+    if (firstOctet >= 192 && firstOctet <= 223) return 'C';
+    if (firstOctet >= 224 && firstOctet <= 239) return 'D (Multicast)';
+    if (firstOctet >= 240 && firstOctet <= 255) return 'E (Zarezerwowana)';
+    
+    return 'Nieznana';
+}
+
+// Get network type (public/private)
+function getNetworkType(ip) {
+    const parts = ip.split('.').map(Number);
+    const firstOctet = parts[0];
+    const secondOctet = parts[1];
+    
+    // Private networks (RFC 1918)
+    if (firstOctet === 10) return 'Prywatna (10.0.0.0/8)';
+    if (firstOctet === 172 && secondOctet >= 16 && secondOctet <= 31) return 'Prywatna (172.16.0.0/12)';
+    if (firstOctet === 192 && secondOctet === 168) return 'Prywatna (192.168.0.0/16)';
+    
+    // Loopback
+    if (firstOctet === 127) return 'Loopback (127.0.0.0/8)';
+    
+    // Link-local
+    if (firstOctet === 169 && secondOctet === 254) return 'Link-local (169.254.0.0/16)';
+    
+    // Multicast
+    if (firstOctet >= 224 && firstOctet <= 239) return 'Multicast';
+    
+    return 'Publiczna';
+}
+
+// Main calculation function
+function calculateNetwork() {
+    hideError('calculatorError');
+    
+    const ipInput = document.getElementById('calcIpAddress');
+    const maskSelect = document.getElementById('calcSubnetMask');
+    const maskCustomInput = document.getElementById('calcSubnetMaskCustom');
+    const resultsDiv = document.getElementById('calculatorResults');
+    
+    const ip = ipInput.value.trim();
+    let cidr = null;
+    
+    // Check which mask input to use
+    if (maskSelect.value) {
+        cidr = parseInt(maskSelect.value);
+    } else if (maskCustomInput.value.trim()) {
+        const customMask = maskCustomInput.value.trim();
+        cidr = subnetMaskToCidr(customMask);
+        if (cidr === null) {
+            showError('calculatorError', 'Nieprawidłowy format maski (przykład: 255.255.255.0)');
+            maskCustomInput.classList.add('error');
+            resultsDiv.style.display = 'none';
+            return;
+        }
+    }
+    
+    // Clear previous error states
+    ipInput.classList.remove('error');
+    maskSelect.classList.remove('error');
+    maskCustomInput.classList.remove('error');
+    
+    // Validate inputs
+    let hasError = false;
+    
+    if (!ip) {
+        showError('calculatorError', 'Wprowadź adres IP');
+        ipInput.classList.add('error');
+        hasError = true;
+    } else if (!isValidIP(ip)) {
+        showError('calculatorError', 'Nieprawidłowy format adresu IP (przykład: 192.168.1.100)');
+        ipInput.classList.add('error');
+        hasError = true;
+    }
+    
+    if (cidr === null) {
+        showError('calculatorError', 'Wybierz maskę z listy lub wprowadź w polu tekstowym');
+        if (!maskSelect.value) maskSelect.classList.add('error');
+        if (!maskCustomInput.value.trim()) maskCustomInput.classList.add('error');
+        hasError = true;
+    }
+    
+    if (hasError) {
+        resultsDiv.style.display = 'none';
+        return;
+    }
+    
+    try {
+        // Calculate network parameters
+        const ipInt = ipToInt(ip);
+        const maskInt = 0xFFFFFFFF << (32 - cidr);
+        const networkInt = ipInt & maskInt;
+        const broadcastInt = networkInt | (0xFFFFFFFF >>> cidr);
+        
+        const networkAddress = intToIp(networkInt >>> 0);
+        // For /32 (host route), broadcast is the same as network
+        const broadcastAddress = cidr === 32 ? networkAddress : intToIp(broadcastInt >>> 0);
+        const subnetMask = cidrToSubnetMask(cidr);
+        
+        const totalHosts = Math.pow(2, 32 - cidr);
+        const usableHosts = cidr < 31 ? totalHosts - 2 : (cidr === 31 ? 2 : 1);
+        
+        const hostMin = cidr < 31 ? intToIp((networkInt + 1) >>> 0) : networkAddress;
+        const hostMax = cidr < 31 ? intToIp((broadcastInt - 1) >>> 0) : (cidr === 32 ? networkAddress : broadcastAddress);
+        
+        const networkClass = getNetworkClass(networkAddress);
+        const networkType = getNetworkType(networkAddress);
+        
+        // Display results
+        document.getElementById('resultNetwork').textContent = networkAddress;
+        document.getElementById('resultSubnetMask').textContent = subnetMask;
+        document.getElementById('resultCidr').textContent = `/${cidr}`;
+        document.getElementById('resultBroadcast').textContent = broadcastAddress;
+        document.getElementById('resultHostMin').textContent = hostMin;
+        document.getElementById('resultHostMax').textContent = hostMax;
+        document.getElementById('resultHosts').textContent = totalHosts.toLocaleString();
+        document.getElementById('resultUsableHosts').textContent = usableHosts.toLocaleString();
+        document.getElementById('resultNetworkClass').textContent = networkClass;
+        document.getElementById('resultNetworkType').textContent = networkType;
+        
+        // Additional information
+        let additionalInfo = '';
+        
+        if (cidr >= 30) {
+            if (cidr === 30) {
+                additionalInfo = 'Sieć typu punkt-punkt z 2 dostępnymi adresami hostów.';
+            } else if (cidr === 31) {
+                additionalInfo = 'Sieć типа punkt-punkt (RFC 3021) bez adresów sieci i rozgłoszeniowych.';
+            } else if (cidr === 32) {
+                additionalInfo = 'Adres hosta (host route) - pojedynczy adres IP.';
+            }
+        } else if (cidr <= 8) {
+            additionalInfo = 'Bardzo duża sieć - uwaga na wydajność i zarządzanie ruchem.';
+        } else if (totalHosts > 1000000) {
+            additionalInfo = 'Duża sieć - rozważ podział na mniejsze подсети.';
+        }
+        
+        if (networkType.includes('Prywatna')) {
+            additionalInfo += (additionalInfo ? ' ' : '') + 'Sieć prywatna - nie routowana w Internecie.';
+        }
+        
+        document.getElementById('resultAdditionalInfo').innerHTML = 
+            additionalInfo ? `<div class="info-text">${additionalInfo}</div>` : '';
+        
+        // Show results with animation
+        resultsDiv.style.display = 'block';
+        resultsDiv.classList.add('highlight');
+        setTimeout(() => resultsDiv.classList.remove('highlight'), 2000);
+        
+    } catch (error) {
+        console.error('Błąd калькуляции:', error);
+        showError('calculatorError', 'Wystąpił błąd podczas obliczeń');
+        resultsDiv.style.display = 'none';
+    }
+}
+
+// Clear calculator inputs and results
+function clearCalculator() {
+    document.getElementById('calcIpAddress').value = '';
+    document.getElementById('calcSubnetMask').value = '';
+    document.getElementById('calcSubnetMaskCustom').value = '';
+    document.getElementById('calculatorResults').style.display = 'none';
+    
+    // Clear error states
+    document.getElementById('calcIpAddress').classList.remove('error');
+    document.getElementById('calcSubnetMask').classList.remove('error');
+    document.getElementById('calcSubnetMaskCustom').classList.remove('error');
+    hideError('calculatorError');
+}
+
+// Helper function to show error
+function showError(elementId, message) {
+    const errorElement = document.getElementById(elementId);
+    errorElement.textContent = message;
+    errorElement.style.display = 'block';
+}
+
+// Helper function to hide error
+function hideError(elementId) {
+    const errorElement = document.getElementById(elementId);
+    errorElement.style.display = 'none';
 }

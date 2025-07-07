@@ -43,6 +43,7 @@
             <button class="tab-button" onclick="showTab('company-management')">Firmy</button>
             <button class="tab-button" onclick="showTab('import-export')">Import/Eksport</button>
             <button class="tab-button" onclick="showTab('analytics')">Analityka</button>
+            <button class="tab-button" onclick="showTab('ip-calculator')">Kalkulator IP</button>
             <button class="tab-button" onclick="showTab('audit-logs')">Logi systemu</button>
         </nav>
 
@@ -257,6 +258,127 @@
             </div>
             
             <div class="pagination" id="logsPagination"></div>
+        </div>
+
+        <!-- IP Calculator Tab -->
+        <div id="ip-calculator" class="tab-content">
+            <h3>Kalkulator IP</h3>
+            <p>Narzędzie do obliczania parametrów sieci IP. Wprowadź adres IP i maskę sieci, aby uzyskać szczegółowe informacje o sieci.</p>
+            
+            <div class="calculator-container">
+                <div class="calculator-input">
+                    <h4>Wprowadź dane sieci</h4>
+                    
+                    <div class="form-group">
+                        <label for="calcIpAddress">Adres IP *</label>
+                        <input type="text" id="calcIpAddress" placeholder="192.168.1.100" maxlength="15">
+                        <small class="help-text">Wprowadź dowolny adres IP z sieci (np. 192.168.1.100)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="calcSubnetMask">Maska sieci *</label>
+                        <select id="calcSubnetMask">
+                            <option value="">Wybierz maskę...</option>
+                            <option value="8">/8 (255.0.0.0)</option>
+                            <option value="9">/9 (255.128.0.0)</option>
+                            <option value="10">/10 (255.192.0.0)</option>
+                            <option value="11">/11 (255.224.0.0)</option>
+                            <option value="12">/12 (255.240.0.0)</option>
+                            <option value="13">/13 (255.248.0.0)</option>
+                            <option value="14">/14 (255.252.0.0)</option>
+                            <option value="15">/15 (255.254.0.0)</option>
+                            <option value="16">/16 (255.255.0.0)</option>
+                            <option value="17">/17 (255.255.128.0)</option>
+                            <option value="18">/18 (255.255.192.0)</option>
+                            <option value="19">/19 (255.255.224.0)</option>
+                            <option value="20">/20 (255.255.240.0)</option>
+                            <option value="21">/21 (255.255.248.0)</option>
+                            <option value="22">/22 (255.255.252.0)</option>
+                            <option value="23">/23 (255.255.254.0)</option>
+                            <option value="24">/24 (255.255.255.0)</option>
+                            <option value="25">/25 (255.255.255.128)</option>
+                            <option value="26">/26 (255.255.255.192)</option>
+                            <option value="27">/27 (255.255.255.224)</option>
+                            <option value="28">/28 (255.255.255.240)</option>
+                            <option value="29">/29 (255.255.255.248)</option>
+                            <option value="30">/30 (255.255.255.252)</option>
+                            <option value="31">/31 (255.255.255.254)</option>
+                            <option value="32">/32 (255.255.255.255)</option>
+                        </select>
+                        <small class="help-text">lub</small>
+                        <input type="text" id="calcSubnetMaskCustom" placeholder="255.255.255.0" maxlength="15">
+                        <small class="help-text">Wprowadź maskę w notacji CIDR (z listy) lub dziesiętnej (pole tekstowe)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <button type="button" class="btn btn-primary" onclick="calculateNetwork()">Oblicz parametry sieci</button>
+                        <button type="button" class="btn btn-secondary" onclick="clearCalculator()">Wyczyść</button>
+                    </div>
+                    
+                    <div id="calculatorError" class="error-message" style="display: none;"></div>
+                </div>
+                
+                <div class="calculator-results" id="calculatorResults" style="display: none;">
+                    <h4>Wyniki obliczeń</h4>
+                    
+                    <div class="result-grid">
+                        <div class="result-item">
+                            <label>Adres sieci:</label>
+                            <span id="resultNetwork" class="result-value"></span>
+                        </div>
+                        
+                        <div class="result-item">
+                            <label>Maska sieci:</label>
+                            <span id="resultSubnetMask" class="result-value"></span>
+                        </div>
+                        
+                        <div class="result-item">
+                            <label>Notacja CIDR:</label>
+                            <span id="resultCidr" class="result-value"></span>
+                        </div>
+                        
+                        <div class="result-item">
+                            <label>Adres rozgłoszeniowy:</label>
+                            <span id="resultBroadcast" class="result-value"></span>
+                        </div>
+                        
+                        <div class="result-item">
+                            <label>Pierwszy adres hosta:</label>
+                            <span id="resultHostMin" class="result-value"></span>
+                        </div>
+                        
+                        <div class="result-item">
+                            <label>Ostatni adres hosta:</label>
+                            <span id="resultHostMax" class="result-value"></span>
+                        </div>
+                        
+                        <div class="result-item">
+                            <label>Liczba hostów:</label>
+                            <span id="resultHosts" class="result-value"></span>
+                        </div>
+                        
+                        <div class="result-item">
+                            <label>Dostępne adresy:</label>
+                            <span id="resultUsableHosts" class="result-value"></span>
+                        </div>
+                        
+                        <div class="result-item">
+                            <label>Klasa sieci:</label>
+                            <span id="resultNetworkClass" class="result-value"></span>
+                        </div>
+                        
+                        <div class="result-item">
+                            <label>Typ sieci:</label>
+                            <span id="resultNetworkType" class="result-value"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="result-info">
+                        <h5>Informacje dodatkowe</h5>
+                        <div id="resultAdditionalInfo"></div>
+                    </div>
+                </div>
+            </div>
         </div>
 
     </div>
