@@ -144,6 +144,61 @@ db.serialize(() => {
   )`);
 });
 
+// ==========================================
+// IP ADDRESS NORMALIZATION FUNCTIONS
+// ==========================================
+
+// Validate IP address format
+function isValidIP(ip) {
+  const ipRegex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+  const match = ip.match(ipRegex);
+  
+  if (!match) return false;
+  
+  for (let i = 1; i <= 4; i++) {
+    const octet = parseInt(match[i]);
+    if (octet < 0 || octet > 255) return false;
+  }
+  
+  return true;
+}
+
+// Convert IP address to 32-bit integer
+function ipToInt(ip) {
+  const parts = ip.split('.');
+  return (parseInt(parts[0]) << 24) + 
+         (parseInt(parts[1]) << 16) + 
+         (parseInt(parts[2]) << 8) + 
+         parseInt(parts[3]);
+}
+
+// Convert 32-bit integer to IP address
+function intToIp(int) {
+  return [
+    (int >>> 24) & 0xFF,
+    (int >>> 16) & 0xFF,
+    (int >>> 8) & 0xFF,
+    int & 0xFF
+  ].join('.');
+}
+
+// Normalize IP address to network address based on mask
+function normalizeToNetworkAddress(ip, cidr) {
+  if (!isValidIP(ip) || typeof cidr !== 'number' || isNaN(cidr) || cidr < 0 || cidr > 32) {
+    return null;
+  }
+  
+  const ipInt = ipToInt(ip);
+  const maskInt = 0xFFFFFFFF << (32 - cidr);
+  const networkInt = ipInt & maskInt;
+  
+  return intToIp(networkInt >>> 0);
+}
+
+// ==========================================
+// AUDIT LOG FUNCTIONS
+// ==========================================
+
 // Funkcja do zapisu w logu audytu
 function logAudit(req, action, entityType, entityId = null, oldValues = null, newValues = null) {
   const logData = {
@@ -416,17 +471,47 @@ app.get('/api/subnets', requireAuth, (req, res) => {
 app.post('/api/subnets', requireAuth, (req, res) => {
   const { network, mask, company_id, vlan, description } = req.body;
   
+  // Validate IP format
+  if (!isValidIP(network)) {
+    logAudit(req, 'CREATE_SUBNET_FAILED', 'subnet', null, null, { network, mask, company_id, vlan, description, error: 'Invalid IP format' });
+    res.status(400).json({ error: 'Nieprawidłowy format adresu IP' });
+    return;
+  }
+  
+  // Validate mask
+  if (!mask || mask < 0 || mask > 32) {
+    logAudit(req, 'CREATE_SUBNET_FAILED', 'subnet', null, null, { network, mask, company_id, vlan, description, error: 'Invalid mask' });
+    res.status(400).json({ error: 'Nieprawidłowa maska podsieci' });
+    return;
+  }
+  
+  // Normalize IP to network address
+  const normalizedNetwork = normalizeToNetworkAddress(network, mask);
+  if (!normalizedNetwork) {
+    logAudit(req, 'CREATE_SUBNET_FAILED', 'subnet', null, null, { network, mask, company_id, vlan, description, error: 'Failed to normalize network address' });
+    res.status(400).json({ error: 'Błąd podczas normalizacji adresu sieciowego' });
+    return;
+  }
+  
   db.run("INSERT INTO subnets (network, mask, company_id, vlan, description) VALUES (?, ?, ?, ?, ?)",
-    [network, mask, company_id, vlan, description], function(err) {
+    [normalizedNetwork, mask, company_id, vlan, description], function(err) {
       if (err) {
-        logAudit(req, 'CREATE_SUBNET_FAILED', 'subnet', null, null, { network, mask, company_id, vlan, description, error: err.message });
+        logAudit(req, 'CREATE_SUBNET_FAILED', 'subnet', null, null, { network: normalizedNetwork, mask, company_id, vlan, description, error: err.message });
         res.status(500).json({ error: err.message });
         return;
       }
       
-      const subnetData = { id: this.lastID, network, mask, company_id, vlan, description };
+      const subnetData = { id: this.lastID, network: normalizedNetwork, mask, company_id, vlan, description };
       logAudit(req, 'CREATE_SUBNET', 'subnet', this.lastID, null, subnetData);
-      res.json(subnetData);
+      
+      // Inform frontend if IP was normalized
+      const response = { ...subnetData };
+      if (network !== normalizedNetwork) {
+        response.normalized = true;
+        response.originalNetwork = network;
+      }
+      
+      res.json(response);
     });
 });
 
@@ -434,6 +519,25 @@ app.post('/api/subnets', requireAuth, (req, res) => {
 app.put('/api/subnets/:id', requireAuth, (req, res) => {
   const { id } = req.params;
   const { network, mask, company_id, vlan, description } = req.body;
+  
+  // Validate IP format
+  if (!isValidIP(network)) {
+    res.status(400).json({ error: 'Nieprawidłowy format adresu IP' });
+    return;
+  }
+  
+  // Validate mask
+  if (!mask || mask < 0 || mask > 32) {
+    res.status(400).json({ error: 'Nieprawidłowa maska podsieci' });
+    return;
+  }
+  
+  // Normalize IP to network address
+  const normalizedNetwork = normalizeToNetworkAddress(network, mask);
+  if (!normalizedNetwork) {
+    res.status(400).json({ error: 'Błąd podczas normalizacji adresu sieciowego' });
+    return;
+  }
   
   // Najpierw pobieramy stare wartości
   db.get("SELECT * FROM subnets WHERE id = ?", [id], (err, oldSubnet) => {
@@ -443,9 +547,9 @@ app.put('/api/subnets/:id', requireAuth, (req, res) => {
     }
     
     db.run("UPDATE subnets SET network = ?, mask = ?, company_id = ?, vlan = ?, description = ? WHERE id = ?",
-      [network, mask, company_id, vlan, description, id], function(err) {
+      [normalizedNetwork, mask, company_id, vlan, description, id], function(err) {
         if (err) {
-          logAudit(req, 'UPDATE_SUBNET_FAILED', 'subnet', id, oldSubnet, { network, mask, company_id, vlan, description, error: err.message });
+          logAudit(req, 'UPDATE_SUBNET_FAILED', 'subnet', id, oldSubnet, { network: normalizedNetwork, mask, company_id, vlan, description, error: err.message });
           res.status(500).json({ error: err.message });
           return;
         }
@@ -454,9 +558,17 @@ app.put('/api/subnets/:id', requireAuth, (req, res) => {
           return;
         }
         
-        const newSubnet = { id, network, mask, company_id, vlan, description };
+        const newSubnet = { id, network: normalizedNetwork, mask, company_id, vlan, description };
         logAudit(req, 'UPDATE_SUBNET', 'subnet', id, oldSubnet, newSubnet);
-        res.json({ message: 'Podsieć została zaktualizowana', ...newSubnet });
+        
+        // Inform frontend if IP was normalized
+        const response = { message: 'Podsieć została zaktualizowana', ...newSubnet };
+        if (network !== normalizedNetwork) {
+          response.normalized = true;
+          response.originalNetwork = network;
+        }
+        
+        res.json(response);
       });
   });
 });
@@ -930,11 +1042,42 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
           }
           return;
         }
+        
+        // Validate and normalize network address
+        if (!isValidIP(network)) {
+          errors.push(`Wiersz ${index + 1}: Nieprawidłowy format adresu IP: ${network}`);
+          processedRows++;
+          if (processedRows === totalRows) {
+            sendResponse();
+          }
+          return;
+        }
+        
+        const maskValue = parseInt(mask);
+        if (isNaN(maskValue) || maskValue < 0 || maskValue > 32) {
+          errors.push(`Wiersz ${index + 1}: Nieprawidłowa maska: ${mask}`);
+          processedRows++;
+          if (processedRows === totalRows) {
+            sendResponse();
+          }
+          return;
+        }
+        
+        // Normalize network address
+        const normalizedNetwork = normalizeToNetworkAddress(network, maskValue);
+        if (!normalizedNetwork) {
+          errors.push(`Wiersz ${index + 1}: Błąd normalizacji adresu sieciowego: ${network}/${mask}`);
+          processedRows++;
+          if (processedRows === totalRows) {
+            sendResponse();
+          }
+          return;
+        }
 
         db.run(`INSERT OR IGNORE INTO subnets 
                 (network, mask, company_id, vlan, description) 
                 VALUES (?, ?, ?, ?, ?)`,
-          [network, parseInt(mask), finalCompanyId, vlan || null, description || ''],
+          [normalizedNetwork, maskValue, finalCompanyId, vlan || null, description || ''],
           function(insertErr) {
             if (insertErr) {
               errors.push(`Wiersz ${index + 1}: ${insertErr.message}`);

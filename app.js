@@ -763,9 +763,32 @@ function setupEventListeners() {
         subnetForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
+            const networkInput = document.getElementById('subnetNetwork').value.trim();
+            const mask = parseInt(document.getElementById('subnetMask').value);
+            
+            // Validate IP format first
+            if (!isValidIP(networkInput)) {
+                showMessage('Nieprawidłowy format adresu IP', 'error');
+                return;
+            }
+            
+            // Normalize IP to network address
+            const normalizedNetwork = normalizeToNetworkAddress(networkInput, mask);
+            if (!normalizedNetwork) {
+                showMessage('Błąd podczas normalizacji adresu sieciowego', 'error');
+                return;
+            }
+            
+            // Show user notification if IP was normalized
+            if (networkInput !== normalizedNetwork) {
+                showMessage(`Adres IP został znormalizowany z ${networkInput} na ${normalizedNetwork}/${mask}`, 'success');
+                // Update the input field to show the normalized address
+                document.getElementById('subnetNetwork').value = normalizedNetwork;
+            }
+            
             const subnetData = {
-                network: document.getElementById('subnetNetwork').value,
-                mask: parseInt(document.getElementById('subnetMask').value),
+                network: normalizedNetwork,
+                mask: mask,
                 company_id: document.getElementById('subnetCompany').value || null,
                 vlan: document.getElementById('subnetVlan').value ? parseInt(document.getElementById('subnetVlan').value) : null,
                 description: document.getElementById('subnetDescription').value
@@ -966,6 +989,47 @@ function setupEventListeners() {
                 calcMaskSelect.classList.remove('error');
             }
         });
+    }
+    
+    // Real-time network address normalization for subnet form
+    const subnetNetworkInput = document.getElementById('subnetNetwork');
+    const subnetMaskSelect = document.getElementById('subnetMask');
+    
+    if (subnetNetworkInput && subnetMaskSelect) {
+        const validateAndShowNormalized = () => {
+            const network = subnetNetworkInput.value.trim();
+            const mask = parseInt(subnetMaskSelect.value);
+            
+            if (network && mask && isValidIP(network)) {
+                const normalized = normalizeToNetworkAddress(network, mask);
+                if (normalized && normalized !== network) {
+                    // Show helper text with normalized address
+                    let helperText = subnetNetworkInput.nextElementSibling;
+                    if (!helperText || !helperText.classList.contains('normalization-hint')) {
+                        helperText = document.createElement('small');
+                        helperText.className = 'normalization-hint help-text';
+                        subnetNetworkInput.parentNode.insertBefore(helperText, subnetNetworkInput.nextSibling);
+                    }
+                    helperText.textContent = `Adres sieciowy: ${normalized}/${mask}`;
+                    helperText.style.color = '#3498db';
+                } else {
+                    // Remove hint if addresses match
+                    const helperText = subnetNetworkInput.nextElementSibling;
+                    if (helperText && helperText.classList.contains('normalization-hint')) {
+                        helperText.remove();
+                    }
+                }
+            } else {
+                // Remove hint on invalid input
+                const helperText = subnetNetworkInput.nextElementSibling;
+                if (helperText && helperText.classList.contains('normalization-hint')) {
+                    helperText.remove();
+                }
+            }
+        };
+        
+        subnetNetworkInput.addEventListener('input', validateAndShowNormalized);
+        subnetMaskSelect.addEventListener('change', validateAndShowNormalized);
     }
     
     // Закрытие модальных окон по клику вне их
@@ -1666,6 +1730,19 @@ function subnetMaskToCidr(mask) {
 function cidrToSubnetMask(cidr) {
     const mask = 0xFFFFFFFF << (32 - cidr);
     return intToIp(mask >>> 0);
+}
+
+// Normalize IP address to network address based on mask
+function normalizeToNetworkAddress(ip, cidr) {
+    if (!isValidIP(ip) || typeof cidr !== 'number' || isNaN(cidr) || cidr < 0 || cidr > 32) {
+        return null;
+    }
+    
+    const ipInt = ipToInt(ip);
+    const maskInt = 0xFFFFFFFF << (32 - cidr);
+    const networkInt = ipInt & maskInt;
+    
+    return intToIp(networkInt >>> 0);
 }
 
 // Get network class based on first octet

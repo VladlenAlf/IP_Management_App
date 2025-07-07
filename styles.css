@@ -776,6 +776,18 @@ textarea {
     font-size: 14px;
 }
 
+/* Network address normalization hint */
+.normalization-hint {
+    display: block !important;
+    margin-top: 5px;
+    font-weight: 500;
+}
+
+.form-group .normalization-hint {
+    color: #3498db !important;
+    font-size: 12px;
+}
+
 /* Responsywność */
 @media (max-width: 768px) {
     .container {
