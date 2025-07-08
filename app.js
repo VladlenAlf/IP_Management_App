@@ -241,7 +241,7 @@ async function deleteCompany(id) {
     const company = companies.find(c => c.id === id);
     if (!company) return;
     
-    // Защита системной фирмы "Wolне"
+    // Ochrona systemowej firmy "Wolne"
     if (company.name === 'Wolne' || id === 1) {
         showMessage('Nie można usunąć firmy systemowej "Wolne"', 'error');
         return;
@@ -279,13 +279,13 @@ async function checkAuthAndInit() {
         currentUser = authStatus.user;
         updateUserInfo();
         
-        // Сначала загружаем компании, затем подсети i статистику
+        // Najpierw ładujemy firmy, następnie podsieci i statystyki
         await loadCompanies();
         await loadSubnets();
         await loadStats();
         setupEventListeners();
     } catch (error) {
-        console.error('Ошибка проверки авторизации:', error);
+        console.error('Błąd sprawdzania autoryzacji:', error);
         window.location.href = '/login.html';
     }
 }
@@ -324,7 +324,7 @@ async function loadStats() {
         
         console.log('Stats updated in DOM');
     } catch (error) {
-        console.error('Ошибка загрузки статистики:', error);
+        console.error('Błąd ładowania statystyk:', error);
         showMessage('Błąd ładowania statystyk', 'error');
     }
 }
@@ -335,10 +335,10 @@ async function loadSubnets() {
         subnets = await API.fetchSubnets();
         renderSubnetsTable();
         updateSubnetFilters();
-        renderCompaniesTable(); // Обновляем таблицу компаний для актуализации количества подсетей
-        loadStats(); // Обновляем верхнюю панель статистики
+        renderCompaniesTable(); // Aktualizujemy tabelę firm dla odświeżenia liczby podsieci
+        loadStats(); // Aktualizujemy górny panel statystyk
     } catch (error) {
-        console.error('Ошибка загрузки подсетей:', error);
+        console.error('Błąd ładowania podsieci:', error);
     }
 }
 
@@ -347,14 +347,14 @@ async function loadCompanies() {
     try {
         companies = await API.fetchCompanies();
         updateCompanyOptions();
-        renderCompaniesTable(); // Добавлено для отображения таблицы компаний
+        renderCompaniesTable(); // Dodano dla wyświetlania tabeli firm
         
-        // Обновляем аналитику после загрузки компаний
+        // Aktualizujemy analitykę po załadowaniu firm
         if (document.querySelector('.tab-content.active')?.id === 'analytics') {
             await updateAnalytics();
         }
     } catch (error) {
-        console.error('Ошибка загрузки компаний:', error);
+        console.error('Błąd ładowania firm:', error);
     }
 }
 
@@ -367,7 +367,7 @@ async function loadAuditLogs(page = 1, filters = {}) {
         currentLogsPage = page;
         logsFilters = filters;
     } catch (error) {
-        console.error('Ошибка загрузки логов:', error);
+        console.error('Błąd ładowania logów:', error);
         showMessage('Błąd ładowania logów audytu', 'error');
     }
 }
@@ -377,7 +377,7 @@ async function loadAnalytics() {
     try {
         await updateAnalytics();
     } catch (error) {
-        console.error('Ошибка загрузки аналитики:', error);
+        console.error('Błąd ładowania analityki:', error);
         showMessage('Błąd ładowania danych analityki', 'error');
     }
 }
@@ -410,7 +410,7 @@ async function updateAnalytics() {
         console.log('Analytics updated successfully');
         
     } catch (error) {
-        console.error('Ошибка обновления аналитики:', error);
+        console.error('Błąd aktualizacji analityki:', error);
         showMessage('Błąd aktualizacji analityki', 'error');
     }
 }
@@ -628,7 +628,7 @@ function showAddSubnetModal() {
     updateCompanyOptions();
     document.getElementById('subnetModal').style.display = 'block';
     
-    // Устанавливаем обработчик события для формы
+    // Ustawiamy obsługę zdarzenia dla formularza
     setupSubnetFormHandler();
 }
 
@@ -637,7 +637,7 @@ function showAddCompanyModal() {
     document.getElementById('companyForm').reset();
     document.getElementById('companyModal').style.display = 'block';
     
-    // Устанавливаем обработчик события для формы
+    // Ustawiamy obsługę zdarzenia dla formularza
     setupCompanyFormHandler();
 }
 
@@ -696,11 +696,17 @@ function closeModal(modalId) {
     }
 }
 
-// Редактирование подсети
+// Edycja podsieci
 function editSubnet(id) {
     const subnet = subnets.find(s => s.id === id);
     if (!subnet) return;
 
+    console.log('Editing subnet:', subnet); // Отладочная информация
+    
+    // Сначала обновляем опции компаний
+    updateCompanyOptions();
+    
+    // Затем заполняем форму данными
     document.getElementById('subnetModalTitle').textContent = 'Edytuj podsieć';
     document.getElementById('subnetId').value = subnet.id;
     document.getElementById('subnetNetwork').value = subnet.network;
@@ -709,10 +715,12 @@ function editSubnet(id) {
     document.getElementById('subnetVlan').value = subnet.vlan || '';
     document.getElementById('subnetDescription').value = subnet.description || '';
     
-    updateCompanyOptions();
+    console.log('Set mask to:', subnet.mask); // Отладочная информация
+    console.log('Set company to:', subnet.company_id); // Отладочная информация
+    
     document.getElementById('subnetModal').style.display = 'block';
     
-    // Устанавливаем обработчик события для формы
+    // Ustawiamy obsługę zdarzenia dla formularza
     setupSubnetFormHandler();
 }
 
@@ -731,30 +739,31 @@ function editCompany(id) {
     
     document.getElementById('companyModal').style.display = 'block';
     
-    // Устанавливаем обработчик события для формы
+    // Ustawiamy obsługę zdarzenia dla formularza
     setupCompanyFormHandler();
 }
 
 // Обновление опций компаний
 function updateCompanyOptions() {
-    const selects = ['subnetCompany', 'companyFilter', 'analyticsCompanyFilter'];
+    const selects = ['subnetCompany', 'analyticsCompanyFilter'];
+    
+    console.log('Updating company options, available companies:', companies); // Отладочная информация
     
     selects.forEach(selectId => {
         const select = document.getElementById(selectId);
         if (!select) return;
         
         const currentValue = select.value;
+        console.log(`Updating ${selectId}, current value:`, currentValue); // Отладочная информация
         
-        if (selectId === 'companyFilter') {
-            select.innerHTML = '<option value="">Wszystkie firmy</option><option value="free">Wolne</option>';
-        } else if (selectId === 'analyticsCompanyFilter') {
+        if (selectId === 'analyticsCompanyFilter') {
             select.innerHTML = '<option value="">Wszystkie firmy</option>';
         } else {
             select.innerHTML = '<option value="">Wolna (nieprzypisana)</option>';
         }
         
         companies.forEach(company => {
-            if (company.name !== 'Wolne') { // Не показываем "Wолне" как опцию
+            if (company.name !== 'Wolne') { // Не показываем "Wolne" как опцию
                 const option = document.createElement('option');
                 option.value = company.id;
                 option.textContent = company.name;
@@ -762,11 +771,17 @@ function updateCompanyOptions() {
             }
         });
         
-        select.value = currentValue;
+        // Восстанавливаем значение только если оно существует
+        if (currentValue && select.querySelector(`option[value="${currentValue}"]`)) {
+            select.value = currentValue;
+            console.log(`Restored value ${currentValue} for ${selectId}`); // Отладочная информация
+        } else {
+            console.log(`Could not restore value ${currentValue} for ${selectId}`); // Отладочная информация
+        }
     });
 }
 
-// Обновление опций для разделения подсети
+// Aktualizacja opcji do podziału podsieci
 function updateDivideSubnetOptions() {
     const select = document.getElementById('divideSubnetSelect');
     if (!select) return;
@@ -784,7 +799,7 @@ function updateDivideSubnetOptions() {
     });
 }
 
-// Обновление списка выбранных подсетей для объединения
+// Aktualizacja listy wybranych podsieci do łączenia
 function updateSelectedSubnetsForMerge() {
     const container = document.getElementById('selectedSubnetsForMerge');
     if (!container) return;
@@ -811,7 +826,7 @@ function updateSelectedSubnetsForMerge() {
     });
 }
 
-// Обновление опций компаний для массового присвоения
+// Aktualizacja opcji firm dla masowego przypisania
 function updateAssignCompanyOptions() {
     const select = document.getElementById('assignToCompany');
     if (!select) return;
@@ -828,7 +843,7 @@ function updateAssignCompanyOptions() {
     });
 }
 
-// Управление табами
+// Zarządzanie zakładkami
 function showTab(tabName) {
     // Скрыть все табы
     document.querySelectorAll('.tab-content').forEach(tab => {
@@ -850,13 +865,13 @@ function showTab(tabName) {
     } else if (tabName === 'analytics') {
         loadAnalytics();
     } else if (tabName === 'subnet-history') {
-        loadSubnetHistory();
+        loadSubnetHistory(1, {});
     }
     
     currentTab = tabName;
 }
 
-// Обработчик формы подсети
+// Obsługa formularza podsieci
 function setupSubnetFormHandler() {
     const subnetForm = document.getElementById('subnetForm');
     if (subnetForm) {
@@ -963,7 +978,7 @@ function setupEventListeners() {
     setupSubnetFormHandler();
     setupCompanyFormHandler();
     
-    // Форма разделения подсети
+    // Formularz podziału podsieci
     const divideForm = document.getElementById('divideSubnetForm');
     if (divideForm) {
         divideForm.addEventListener('submit', async function(e) {
@@ -988,7 +1003,7 @@ function setupEventListeners() {
                     loadStats();
                 }
             } catch (error) {
-                showMessage('Błąd podczas podziału подсети', 'error');
+                showMessage('Błąd podczas podziału podsieci', 'error');
             }
         });
     }
@@ -1003,7 +1018,7 @@ function setupEventListeners() {
             const subnetIds = Array.from(checkedBoxes).map(cb => parseInt(cb.dataset.subnetId));
             
             if (subnetIds.length < 2) {
-                showMessage('Należy wybrać co najmniej 2 подсети do połącения', 'error');
+                showMessage('Należy wybrać co najmniej 2 podsieci do połączenia', 'error');
                 return;
             }
             
@@ -1018,7 +1033,7 @@ function setupEventListeners() {
                     loadStats();
                 }
             } catch (error) {
-                showMessage('Błąd podczas łączenia подсетей', 'error');
+                showMessage('Błąd podczas łącения подсетей', 'error');
             }
         });
     }
@@ -1198,7 +1213,7 @@ async function importExcel() {
         
         // Odświeżamy dane po импорте подсетей и фирм
         loadSubnets();
-        loadCompanies(); // Dodano для обновления списка компаний
+        loadCompanies(); // Dodano dla aktualizacji listy firm
         fileInput.value = '';
     } catch (error) {
         showMessage('Błąd podczas importu pliku', 'error');
@@ -1254,7 +1269,7 @@ function showMessage(text, type) {
 function calculateSubnetInfo(network, mask) {
     const hostBits = 32 - mask;
     const totalHosts = Math.pow(2, hostBits);
-    const usableHosts = totalHosts - 2; // Исключаем сетевой и broadcast адреса
+    const usableHosts = totalHosts - 2; // Wyłączamy adresy sieciowy i broadcast
     
     return {
         totalHosts,
@@ -1265,7 +1280,7 @@ function calculateSubnetInfo(network, mask) {
 }
 
 function calculateBroadcast(network, mask) {
-    // Упрощенная версия - для более точного расчета нужна более сложная логика
+    // Uproszczona wersja - dla dokładniejszego obliczenia potrzebna jest bardziej złożona logika
     const parts = network.split('.').map(Number);
     const hostBits = 32 - mask;
     const lastOctetBits = hostBits % 8;
@@ -1277,7 +1292,7 @@ function calculateBroadcast(network, mask) {
     return parts.join('.');
 }
 
-// Утилитарные функции для IP
+// Funkcje narzędziowe dla IP
 function isValidIP(ip) {
     const regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
     return regex.test(ip);
@@ -1304,7 +1319,7 @@ function normalizeToNetworkAddress(ip, mask) {
     return networkParts.join('.');
 }
 
-// Отображение таблицы подсетей
+// Wyświetlanie tabeli podsieci
 function renderSubnetsTable() {
     const tbody = document.querySelector('#subnetTable tbody');
     tbody.innerHTML = '';
@@ -1334,7 +1349,7 @@ function renderSubnetsTable() {
     });
 }
 
-// Отображение таблицы компаний
+// Wyświetlanie tabeli firm
 function renderCompaniesTable() {
     const tbody = document.querySelector('#companyTable tbody');
     if (!tbody) return;
@@ -1342,10 +1357,10 @@ function renderCompaniesTable() {
     tbody.innerHTML = '';
 
     companies.forEach(company => {
-        // Подсчитываем количество подсетей для каждой компании
+        // Liczymy ilość podsieci dla każdej firmy
         let subnetCount;
         if (company.name === 'Wolne') {
-            // Для компании "Wolне" считаем подсети с company_id = NULL или company_id = 1
+            // Dla firmy "Wolne" liczymy podsieci z company_id = NULL lub company_id = 1
             subnetCount = subnets.filter(subnet => 
                 subnet.company_id === null || subnet.company_id === 1
             ).length;
@@ -1373,28 +1388,28 @@ function renderCompaniesTable() {
     });
 }
 
-// Отображение таблицы логов
+// Wyświetlanie tabeli logów
 function renderLogsTable(logs) {
     const tbody = document.querySelector('#logsTable tbody');
     tbody.innerHTML = '';
 
     logs.forEach(log => {
         const row = document.createElement('tr');
-        // Используем новую функцию для форматирования даты
+        // Używamy nowej funkcji do formatowania daty
         const date = formatDateForPoland(log.created_date);
         
-        // Форматируем действие для отображения
+        // Formatujemy akcję do wyświetlenia
         const actionMap = {
             'LOGIN_SUCCESS': 'Logowanie do systemu',
             'LOGIN_FAILED': 'Nieudane logowanie',
             'LOGOUT': 'Wylogowanie z systemu',
             'CREATE_SUBNET': 'Tworzenie podsieci',
-            'CREATE_SUBNET_FAILED': 'Błąд tworzenia подсети',
+            'CREATE_SUBNET_FAILED': 'Błąd tworzenia podsieci',
             'UPDATE_SUBNET': 'Modyfikacja podsieci',
-            'UPDATE_SUBNET_FAILED': 'Błąд мodyfikacji подсети',
-            'DELETE_SUBNET': 'Usuwanie подсети',
-            'DELETE_SUBNET_FAILED': 'Błąд usuwania подсети',
-            'DIVIDE_SUBNET': 'Поделить подсеть',
+            'UPDATE_SUBNET_FAILED': 'Błąd modyfikacji podsieci',
+            'DELETE_SUBNET': 'Usuwanie podsieci',
+            'DELETE_SUBNET_FAILED': 'Błąd usuwania podsieci',
+            'DIVIDE_SUBNET': 'Podział podsieci',
             'MERGE_SUBNETS': 'Łączenie podsieci',
             'ASSIGN_SUBNETS': 'Przypisanie podsieci',
             'ASSIGN_FREE_SUBNETS': 'Przypisanie wolnych podsieci',
@@ -1443,7 +1458,7 @@ function renderLogsTable(logs) {
     }
 }
 
-// Функция для форматирования даты по польскому времени
+// Funkcja do formatowania daty według czasu polskiego
 function formatDateForPoland(dateString) {
     const date = new Date(dateString);
     return date.toLocaleString('pl-PL', {
@@ -1457,7 +1472,7 @@ function formatDateForPoland(dateString) {
     });
 }
 
-// Отображение пагинации для логов
+// Wyświetlanie paginacji dla logów
 function renderLogsPagination(data) {
     const pagination = document.getElementById('logsPagination');
     pagination.innerHTML = '';
@@ -1501,7 +1516,7 @@ function renderLogsPagination(data) {
     pagination.appendChild(info);
 }
 
-// Показать детали лога
+// Pokaż szczegóły loga
 async function showLogDetails(logId) {
     try {
         const log = await API.fetchLogDetails(logId);
@@ -1515,18 +1530,18 @@ async function showLogDetails(logId) {
         document.getElementById('logDetailDate').textContent = formatDateForPoland(log.created_date);
         document.getElementById('logDetailUser').textContent = log.username;
         
-        // Форматируем действие
+        // Formatujemy akcję
         const actionMap = {
             'LOGIN_SUCCESS': 'Logowanie do systemu',
             'LOGIN_FAILED': 'Nieudane logowanie',
             'LOGOUT': 'Wylogowanie z systemu',
             'CREATE_SUBNET': 'Tworzenie podsieci',
-            'CREATE_SUBNET_FAILED': 'Błąд tworzenia подсети',
+            'CREATE_SUBNET_FAILED': 'Błąd tworzenia podsieci',
             'UPDATE_SUBNET': 'Modyfikacja podsieci',
-            'UPDATE_SUBNET_FAILED': 'Błąд мodyfikacji подсети',
-            'DELETE_SUBNET': 'Usuwanie подсети',
-            'DELETE_SUBNET_FAILED': 'Błąд usuwania подсети',
-            'DIVIDE_SUBNET': 'Поделить подсеть',
+            'UPDATE_SUBNET_FAILED': 'Błąd мodyfikacji подсети',
+            'DELETE_SUBNET': 'Usuwanie podsieci',
+            'DELETE_SUBNET_FAILED': 'Błąd usuwania podsieci',
+            'DIVIDE_SUBNET': 'Podział podsieci',
             'MERGE_SUBNETS': 'Łączenie podsieci',
             'ASSIGN_SUBNETS': 'Przypisanie podsieci',
             'ASSIGN_FREE_SUBNETS': 'Przypisanie wolnych podsieci',
@@ -1591,8 +1606,8 @@ async function showLogDetails(logId) {
         document.getElementById('logDetailsModal').style.display = 'block';
         
     } catch (error) {
-        console.error('Ошибка загрузки деталей лога:', error);
-        showMessage('Ошибка загрузки деталей лога', 'error');
+        console.error('Błąd ładowania szczegółów loga:', error);
+        showMessage('Błąd ładowania szczegółów loga', 'error');
     }
 }
 
@@ -1615,9 +1630,27 @@ function updateSubnetFilters() {
     });
 }
 
-// Удаление подсети
+// Clear subnet filters
+function clearSubnetFilters() {
+    // Clear all filter inputs
+    const filterElements = [
+        'searchInput',
+        'vlanFilter',
+        'companyTextFilter'
+    ];
+    
+    filterElements.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) element.value = '';
+    });
+    
+    // Re-run filter to show all subnets
+    filterSubnets();
+}
+
+// Usuwanie podsieci
 async function deleteSubnet(id) {
-    if (!confirm('Czy na pewno chcesz usunąć эту подсеть?')) {
+    if (!confirm('Czy na pewno chcesz usunąć tę podsieć?')) {
         return;
     }
     
@@ -1627,11 +1660,11 @@ async function deleteSubnet(id) {
         loadSubnets();
         loadStats();
     } catch (error) {
-        showMessage('Błąd podczas usuwania подсети', 'error');
+        showMessage('Błąd podczas usuwania podsieci', 'error');
     }
 }
 
-// Функции для открытия модальных окон новых операций
+// Funkcje do otwierania modalnych okien nowych operacji
 function showAddCompanyModal() {
     document.getElementById('companyModalTitle').textContent = 'Dodaj firmę';
     document.getElementById('companyForm').reset();
@@ -1668,22 +1701,22 @@ function showAssignFreeSubnetsModal() {
     document.getElementById('assignFreeSubnetsModal').style.display = 'block';
 }
 
-// Функция для открытия модального окна разделения для конкретной подсети
+// Funkcja do otwierania modalnego okna podziału dla konkretnej podsieci
 function showDivideSubnetModalForId(subnetId) {
-    // Находим подсеть по ID
+    // Znajdujemy podsieć po ID
     const subnet = subnets.find(s => s.id === subnetId);
     if (!subnet) {
-        showMessage('Не найдена подсеть для разделения', 'error');
+        showMessage('Nie znaleziono podsieci do podziału', 'error');
         return;
     }
 
-    // Заполняем модальное окно данными о выбранной подсети
+    // Wypełniamy modalne okno danymi o wybranej podsieci
     const modal = document.getElementById('divideSubnetModal');
     const form = document.getElementById('divideSubnetForm');
     const select = document.getElementById('divideSubnetSelect');
     const newMaskField = document.getElementById('newMask');
     
-    // Очищаем select и добавляем только выбранную подсеть
+    // Czyścimy select i dodajemy tylko wybraną podsieć
     select.innerHTML = '';
     const option = document.createElement('option');
     option.value = subnet.id;
@@ -1694,7 +1727,7 @@ function showDivideSubnetModalForId(subnetId) {
     option.selected = true;
     select.appendChild(option);
     
-    // Делаем select недоступным для изменения, поскольку подсеть уже выбрана
+    // Czynimy select niedostępnym do zmiany, ponieważ podsieć już wybrana
     select.disabled = true;
     
     // Устанавливаем минимальное значение маски (больше текущей)
@@ -1718,7 +1751,7 @@ function showDivideSubnetModalForId(subnetId) {
     modal.style.display = 'block';
 }
 
-// Модифицируем существующую функцию для восстановления оригинального поведения
+// Modyfikujemy istniejącą funkcję dla przywrócenia oryginalnego zachowania
 function showDivideSubnetModal() {
     const select = document.getElementById('divideSubnetSelect');
     const newMaskField = document.getElementById('newMask');
@@ -1753,6 +1786,9 @@ async function loadSubnetHistory(page = 1, filters = {}) {
         
         renderSubnetHistoryTable();
         renderHistoryPagination(result);
+        
+        // Aktualizujemy filtr firm po załadowaniu danych
+        await loadCompanies(); // Убеждаемся что компании загружены
         updateHistoryCompanyFilter();
         
     } catch (error) {
@@ -1768,13 +1804,45 @@ function renderSubnetHistoryTable() {
     
     tbody.innerHTML = '';
 
+    if (!subnetHistory || subnetHistory.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = '<td colspan="9" style="text-align: center; color: #666; padding: 20px;">Brak wyników do wyświetlenia</td>';
+        tbody.appendChild(row);
+        return;
+    }
+
     subnetHistory.forEach(subnet => {
         const row = document.createElement('tr');
         const statusClass = subnet.status === 'active' ? 'active' : 'deleted';
         const companyName = subnet.company_name || 'Wolna';
         const vlan = subnet.vlan || '-';
-        const deletedDate = subnet.deleted_date ? new Date(subnet.deleted_date).toLocaleDateString() : '-';
-        const lastActivity = subnet.last_activity ? new Date(subnet.last_activity).toLocaleDateString() : '-';
+        
+        // Formatowanie дат
+        const formatDate = (dateStr) => {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('pl-PL', { 
+                year: 'numeric', 
+                month: '2-digit', 
+                day: '2-digit' 
+            });
+        };
+        
+        const formatDateTime = (dateStr) => {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('pl-PL', { 
+                year: 'numeric', 
+                month: '2-digit', 
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        };
+        
+        const createdDate = formatDate(subnet.created_date);
+        const deletedDate = formatDate(subnet.deleted_date);
+        const lastActivity = formatDateTime(subnet.last_activity);
         
         row.innerHTML = `
             <td>${subnet.network}</td>
@@ -1782,9 +1850,9 @@ function renderSubnetHistoryTable() {
             <td>${companyName}</td>
             <td>${vlan}</td>
             <td><span class="status-badge ${statusClass}">${subnet.status === 'active' ? 'Aktywna' : 'Usunięta'}</span></td>
-            <td>${new Date(subnet.created_date).toLocaleDateString()}</td>
-            <td>${deletedDate}</td>
-            <td>${lastActivity}</td>
+            <td><span class="compact-date">${createdDate}</span></td>
+            <td><span class="compact-date">${deletedDate}</span></td>
+            <td><span class="compact-date">${lastActivity}</span></td>
             <td>
                 <button class="btn btn-small btn-primary" onclick="showSubnetDetailedHistory(${subnet.id})">Historia</button>
             </td>
@@ -1793,14 +1861,32 @@ function renderSubnetHistoryTable() {
     });
 }
 
-// Renderowanie пагинации для истории
+// Renderowanie paginacji dla historii
 function renderHistoryPagination(result) {
     const pagination = document.getElementById('historyPagination');
     if (!pagination) return;
     
     pagination.innerHTML = '';
     
-    if (result.totalPages <= 1) return;
+    // Если нет результатов, показываем информацию
+    if (!result || !result.subnets || result.subnets.length === 0) {
+        const noResults = document.createElement('span');
+        noResults.textContent = 'Brak wyników do wyświetlenia';
+        noResults.style.margin = '0 15px';
+        noResults.style.color = '#666';
+        pagination.appendChild(noResults);
+        return;
+    }
+    
+    // Если всего одна страница, не показываем навигацию
+    if (!result.totalPages || result.totalPages <= 1) {
+        const pageInfo = document.createElement('span');
+        pageInfo.textContent = `Znaleziono ${result.total || result.subnets.length} wyników`;
+        pageInfo.style.margin = '0 15px';
+        pageInfo.style.color = '#666';
+        pagination.appendChild(pageInfo);
+        return;
+    }
     
     // Previous button
     if (result.page > 1) {
@@ -1813,7 +1899,7 @@ function renderHistoryPagination(result) {
     
     // Page info
     const pageInfo = document.createElement('span');
-    pageInfo.textContent = `Strona ${result.page} z ${result.totalPages}`;
+    pageInfo.textContent = `Strona ${result.page || 1} z ${result.totalPages || 1} (${result.total || 0} wyników)`;
     pageInfo.style.margin = '0 15px';
     pagination.appendChild(pageInfo);
     
@@ -1832,6 +1918,8 @@ function updateHistoryCompanyFilter() {
     const select = document.getElementById('historyCompanyFilter');
     if (!select) return;
     
+    const currentValue = select.value; // Сохраняем текущее значение
+    
     // Clear existing options except first
     select.innerHTML = '<option value="">Wszystkie firmy</option>';
     
@@ -1841,6 +1929,11 @@ function updateHistoryCompanyFilter() {
         option.textContent = company.name;
         select.appendChild(option);
     });
+    
+    // Восстанавливаем выбранное значение
+    if (currentValue) {
+        select.value = currentValue;
+    }
 }
 
 // Filtrowanie historii podsieci
@@ -1849,11 +1942,18 @@ function filterSubnetHistory() {
     const statusFilter = document.getElementById('historyStatusFilter')?.value || '';
     const companyFilter = document.getElementById('historyCompanyFilter')?.value || '';
     
-    const filters = {
-        subnet_filter: subnetFilter,
-        status_filter: statusFilter,
-        company_filter: companyFilter
-    };
+    const filters = {};
+    
+    // Добавляем фильтры только если они не пустые
+    if (subnetFilter.trim()) {
+        filters.subnet_filter = subnetFilter;
+    }
+    if (statusFilter) {
+        filters.status_filter = statusFilter;
+    }
+    if (companyFilter) {
+        filters.company_filter = companyFilter;
+    }
     
     loadSubnetHistory(1, filters);
 }
@@ -1867,13 +1967,13 @@ function resetSubnetHistoryFilters() {
     loadSubnetHistory(1, {});
 }
 
-// Pokazanie szczegółовой истории подсети
+// Pokazanie szczegółowej historii podsieci
 async function showSubnetDetailedHistory(subnetId) {
     try {
         const result = await API.fetchSubnetDetailedHistory(subnetId);
         currentDetailedHistory = result;
         
-        // Актуализация информации о подсети
+        // Aktualizacja informacji o podsieci
         updateSubnetHistoryInfo(result.subnet);
         
         // Рендеринг истории
@@ -1886,8 +1986,8 @@ async function showSubnetDetailedHistory(subnetId) {
         document.getElementById('subnetDetailedHistoryModal').style.display = 'block';
         
     } catch (error) {
-        console.error('Błąd во время ładowania szczegółовой истории:', error);
-        showMessage('Błąд во время ładowania szczegółовой истории подсети', 'error');
+        console.error('Błąд во время ładowania szczegółовой истории:', error);
+        showMessage('Błąd podczas ładowania szczegółowej historii podsieci', 'error');
     }
 }
 
@@ -1980,7 +2080,7 @@ function renderDetailedHistoryTable(history) {
     });
 }
 
-// Formatowanie wartości для истории
+// Formatowanie wartości dla historii
 function formatHistoryValues(values) {
     if (!values) return '-';
     
@@ -1988,7 +2088,7 @@ function formatHistoryValues(values) {
     if (Array.isArray(values)) {
         const formatted = values.map((item, index) => {
             if (typeof item === 'object' && item !== null) {
-                // Специальная обработка для объектов подсетей
+                // Specjalna obsługa dla obiektów podsieci
                 if (item.network && item.mask) {
                     return `${index + 1}. ${item.network}/${item.mask}${item.company_name ? ` (${item.company_name})` : ''}`;
                 }
@@ -2074,7 +2174,7 @@ function formatActionDetails(action, oldValues, newValues) {
     }
 }
 
-// Tłumaczenie названий полей
+// Тłumaczenie названий полей
 function translateFieldName(fieldName) {
     const translations = {
         'network': 'Sieć',
@@ -2097,11 +2197,10 @@ function translateAction(action) {
         'LOGOUT': 'Wylogowanie z systemu',
         'CREATE_SUBNET': 'Tworzenie podsieci',
         'CREATE_SUBNET_FAILED': 'Błąd tworzenia подсети',
-        'UPDATE_SUBNET': 'Modyfikacja podsieci',
-        'UPDATE_SUBNET_FAILED': 'Błąд мodyfikacji подсети',
-        'DELETE_SUBNET': 'Usuwanie подсети',
-        'DELETE_SUBNET_FAILED': 'Błąд usuwania подсети',
-        'DIVIDE_SUBNET': 'Поделить подсеть',
+        'UPDATE_SUBNET': 'Modyfikacja podsieci',            'UPDATE_SUBNET_FAILED': 'Błąd modyfikacji podsieci',
+            'DELETE_SUBNET': 'Usuwanie podsieci',
+            'DELETE_SUBNET_FAILED': 'Błąd usuwania podsieci',
+            'DIVIDE_SUBNET': 'Podział podsieci',
         'MERGE_SUBNETS': 'Łączenie podsieci',
         'ASSIGN_SUBNETS': 'Przypisanie подсети',
         'ASSIGN_FREE_SUBNETS': 'Przypisanie wolnych подсетей',
@@ -2557,7 +2656,7 @@ function displayCalculatorResults(results) {
         if (results.usableHosts === 1) {
             info += '<p><strong>Host route:</strong> To jest pojedynczy host (/32)</p>';
         } else if (results.usableHosts === 2) {
-            info += '<p><strong>Point-to-point:</strong> Sieć typu punkt-punkt (/31)</p>';
+            info += '<p><strong>Point-to-point:</strong> Sieć типа пункт-пункт (/31)</p>';
         }
         
         if (results.networkType === 'Prywatna') {
@@ -2574,8 +2673,9 @@ function displayCalculatorResults(results) {
 
 // Filtering functions for Subnets tab
 function filterSubnets() {
-    const companyFilter = document.getElementById('companyFilter')?.value || '';
     const searchInput = document.getElementById('searchInput')?.value.toLowerCase() || '';
+    const vlanFilter = document.getElementById('vlanFilter')?.value.toLowerCase() || '';
+    const companyTextFilter = document.getElementById('companyTextFilter')?.value.toLowerCase() || '';
     
     const tbody = document.querySelector('#subnetTable tbody');
     if (!tbody) return;
@@ -2586,23 +2686,31 @@ function filterSubnets() {
         let visible = true;
         const cells = row.querySelectorAll('td');
         
-        if (cells.length < 5) return; // Skip if not enough cells
+        if (cells.length < 7) return; // Skip if not enough cells
         
         // Get data from cells
         const network = cells[1]?.textContent || '';
         const company = cells[4]?.textContent || '';
+        const vlan = cells[5]?.textContent || '';
         const description = cells[6]?.textContent || '';
         
-        // Company filter
-        if (companyFilter) {
-            const subnet = subnets.find(s => 
-                s.network === network.trim() && 
-                s.company_id == companyFilter
-            );
-            if (!subnet) visible = false;
+        // VLAN text filter
+        if (vlanFilter && visible) {
+            const vlanText = vlan.toLowerCase();
+            if (!vlanText.includes(vlanFilter)) {
+                visible = false;
+            }
         }
         
-        // Search filter
+        // Company text filter
+        if (companyTextFilter && visible) {
+            const companyText = company.toLowerCase();
+            if (!companyText.includes(companyTextFilter)) {
+                visible = false;
+            }
+        }
+        
+        // General search filter
         if (searchInput && visible) {
             const searchableText = (network + ' ' + company + ' ' + description).toLowerCase();
             if (!searchableText.includes(searchInput)) {

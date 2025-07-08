@@ -84,7 +84,7 @@ db.serialize(() => {
     created_date DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  // Dodawanie domyślnych firm z гарантированными ID
+  // Dodawanie domyślnych firm z gwarantowanymi ID
   db.run(`INSERT OR IGNORE INTO companies (id, name, description) VALUES (1, 'Wolne', 'Nieprzypisane podsieci')`);
 
   // Tabela podsieci (nowa struktura)
@@ -101,7 +101,7 @@ db.serialize(() => {
     FOREIGN KEY (parent_id) REFERENCES subnets (id)
   )`);
 
-  // Додajemy нове kolumnы до існуючої таблиці podsieci
+  // Dodajemy nowe kolumny do istniejącej tabeli podsieci
   db.all("PRAGMA table_info(subnets)", (err, columns) => {
     if (!err) {
       const existingColumns = columns.map(col => col.name);
@@ -346,16 +346,16 @@ app.post('/api/companies', requireAuth, (req, res) => {
     });
 });
 
-// Редактирование компании
+// Edycja firmy
 app.put('/api/companies/:id', requireAuth, (req, res) => {
   const { id } = req.params;
   const { name, description } = req.body;
   
   console.log(`PUT /api/companies/${id}:`, { name, description });
   
-  // Проверяем, что это не системная компания
+  // Sprawdzamy, czy to nie firma systemowa
   if (parseInt(id) <= 2) {
-    console.log(`Попытка редактирования системной компании ID: ${id}`);
+    console.log(`Próba edycji systemowej firmy ID: ${id}`);
     res.status(400).json({ error: 'Nie można edytować firmy systemowej' });
     return;
   }
@@ -379,13 +379,13 @@ app.put('/api/companies/:id', requireAuth, (req, res) => {
     db.run("UPDATE companies SET name = ?, description = ? WHERE id = ?",
       [name, description, id], function(err) {
         if (err) {
-          console.log(`Błąd UPDATE компании ${id}:`, err.message);
+          console.log(`Błąd UPDATE firmy ${id}:`, err.message);
           logAudit(req, 'UPDATE_COMPANY_FAILED', 'company', id, null, { name, description, error: err.message });
           res.status(500).json({ error: err.message });
           return;
         }
         
-        console.log(`Компания ${id} успешно обновлена:`, { name, description });
+        console.log(`Firma ${id} pomyślnie zaktualizowana:`, { name, description });
         const companyData = { id: parseInt(id), name, description };
         logAudit(req, 'UPDATE_COMPANY', 'company', id, null, companyData);
         res.json(companyData);
@@ -401,7 +401,7 @@ app.delete('/api/companies/:id', requireAuth, (req, res) => {
   
   // Sprawdzamy, czy to nie firma systemowa
   if (parseInt(id) <= 2) {
-    console.log(`Попытка удаления системной компании ID: ${id}`);
+    console.log(`Próba usunięcia systemowej firmy ID: ${id}`);
     res.status(400).json({ error: 'Nie można usunąć firmy systemowej' });
     return;
   }
@@ -649,7 +649,7 @@ app.post('/api/subnets/:id/divide', requireAuth, (req, res) => {
       });
     }
     
-    // Записujemy nowe podsieci do bazy danych
+    // Zapisujemy nowe podsieci do bazy danych
     const stmt = db.prepare("INSERT INTO subnets (network, mask, company_id, vlan, description, parent_id) VALUES (?, ?, ?, ?, ?, ?)");
     const insertedSubnets = [];
     
@@ -927,10 +927,10 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
     let errors = [];
     let companiesCreated = 0;
     
-    // Кэш компаний для избежания дублирования запросов
+    // Cache firm dla uniknięcia duplikowania zapytań
     const companyCache = new Map();
 
-    // Функция для получения или создания компании по имени
+    // Funkcja do pobierania lub tworzenia firmy według nazwy
     const getOrCreateCompanyByName = (companyName, callback) => {
       if (!companyName || companyName.trim() === '') {
         return callback(null, null);
@@ -938,24 +938,24 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
       
       const normalizedName = companyName.trim();
       
-      // Проверяем кэш
+      // Sprawdzamy cache
       if (companyCache.has(normalizedName)) {
         return callback(null, companyCache.get(normalizedName));
       }
       
-      // Ищем существующую компанию
+      // Szukamy istniejącej firmy
       db.get("SELECT id FROM companies WHERE name = ?", [normalizedName], (err, row) => {
         if (err) {
           return callback(err, null);
         }
         
         if (row) {
-          // Компания существует
+          // Firma istnieje
           companyCache.set(normalizedName, row.id);
           return callback(null, row.id);
         }
         
-        // Создаем новую компанию
+        // Tworzymy nową firmę
         db.run("INSERT INTO companies (name, description) VALUES (?, ?)", 
           [normalizedName, `Firma utworzona podczas importu`], 
           function(err) {
@@ -969,7 +969,7 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
       });
     };
 
-    // Функция для создания компании с определенным ID
+    // Funkcja do tworzenia firmy z określonym ID
     const createCompanyWithId = (companyId, companyName, callback) => {
       if (!companyName || companyName.trim() === '') {
         return callback(null, companyId);
@@ -977,21 +977,21 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
       
       const normalizedName = companyName.trim();
       
-      // Защита системных компаний от перезаписи
+      // Ochrona systemowych firm przed nadpisaniem
       if (companyId <= 2) {
         return callback(new Error(`Nie można modyfikować systemowej firmy (ID: ${companyId})`), null);
       }
       
-      // Проверяем, существует ли уже компания с таким ID
+      // Sprawdzamy, czy istnieje już firma z takim ID
       db.get("SELECT id, name FROM companies WHERE id = ?", [companyId], (err, row) => {
         if (err) {
           return callback(err, null);
         }
         
         if (row) {
-          // Компания с таким ID уже существует
+          // Firma z takim ID już istnieje
           if (row.name !== normalizedName) {
-            // Обновляем название, если оно отличается
+            // Aktualizujemy nazwę, jeśli się różni
             db.run("UPDATE companies SET name = ?, description = ? WHERE id = ?", 
               [normalizedName, `Firma zaktualizowana podczas importu`, companyId], 
               (updateErr) => {
@@ -1006,7 +1006,7 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
             callback(null, companyId);
           }
         } else {
-          // Создаем новую компанию с определенным ID
+          // Tworzymy nową firmę z określonym ID
           db.run("INSERT INTO companies (id, name, description) VALUES (?, ?, ?)", 
             [companyId, normalizedName, `Firma utworzona podczas importu`], 
             function(insertErr) {
@@ -1021,12 +1021,12 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
       });
     };
 
-    // Обрабатываем каждую строку
+    // Przetwarzamy każdy wiersz
     let processedRows = 0;
     const totalRows = data.length;
 
     data.forEach((row, index) => {
-      // Поддерживаем как польские, так и английские названия колонок
+      // Obsługujemy zarówno polskie, jak i angielskie nazwy kolumn
       const network = row.network || row['Sieć'];
       const mask = row.mask || row['Maska'];
       const company = row.company || row['Firma'] || row.company_name;
@@ -1044,20 +1044,20 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
         return;
       }
 
-      // Определяем способ обработки компании
+      // Określamy sposób przetwarzania firmy
       let companyHandler;
       
       if (company_id && name) {
-        // Если указаны и company_id, и name - создаем/обновляем компанию с конкретным ID
+        // Jeśli podano i company_id, i name - tworzymy/aktualizujemy firmę z konkretnym ID
         companyHandler = (callback) => createCompanyWithId(parseInt(company_id), name, callback);
       } else if (company) {
-        // Если указана только company (старый формат) - создаем компанию с автоматическим ID
+        // Jeśli podano tylko company (stary format) - tworzymy firmę z automatycznym ID
         companyHandler = (callback) => getOrCreateCompanyByName(company, callback);
       } else if (company_id) {
-        // Если указан только company_id - используем существующую компанию
+        // Jeśli podano tylko company_id - używamy istniejącej firmy
         companyHandler = (callback) => callback(null, parseInt(company_id));
       } else {
-        // Если ничего не указано - подсеть будет свободной
+        // Jeśli nic nie podano - podsieć będzie wolna
         companyHandler = (callback) => callback(null, null);
       }
 
@@ -1147,7 +1147,7 @@ app.post('/api/import-excel', requireAuth, upload.single('excelFile'), (req, res
       });
     };
 
-    // Если нет данных для обработки
+    // Jeśli brak danych do przetwarzania
     if (totalRows === 0) {
       sendResponse();
     }
@@ -1307,8 +1307,11 @@ app.get('/api/subnet-history', requireAuth, (req, res) => {
   const { page = 1, limit = 50, subnet_filter, status_filter, company_filter } = req.query;
   const offset = (page - 1) * limit;
   
-  // First, get all unique subnets that have ever existed (from current subnets + audit logs)
-  let subnetQuery = `
+  let whereConditions = [];
+  let params = [];
+  
+  // Build the main query to get all subnets (active + deleted)
+  let query = `
     SELECT DISTINCT 
       s.id, s.network, s.mask, s.company_id, s.vlan, s.description, s.created_date,
       c.name as company_name,
@@ -1317,10 +1320,9 @@ app.get('/api/subnet-history', requireAuth, (req, res) => {
       (SELECT MAX(al.created_date) FROM audit_logs al WHERE al.entity_type = 'subnet' AND al.entity_id = s.id) as last_activity
     FROM subnets s
     LEFT JOIN companies c ON s.company_id = c.id
-    WHERE 1=1
-  `;
-  
-  let deletedSubnetQuery = `
+    
+    UNION ALL
+    
     SELECT DISTINCT 
       CAST(al.entity_id AS INTEGER) as id,
       COALESCE(JSON_EXTRACT(al.old_values, '$.network'), JSON_EXTRACT(al.new_values, '$.network')) as network,
@@ -1339,84 +1341,59 @@ app.get('/api/subnet-history', requireAuth, (req, res) => {
       AND al.entity_id NOT IN (SELECT CAST(id AS TEXT) FROM subnets)
   `;
   
-  let params = [];
-  let countParams = [];
+  // Apply post-filtering with a simpler approach
+  const applyFilters = (rows) => {
+    let filtered = rows;
+    
+    if (subnet_filter) {
+      const filter = subnet_filter.toLowerCase();
+      filtered = filtered.filter(row => 
+        (row.network && row.network.toLowerCase().includes(filter)) ||
+        (row.description && row.description.toLowerCase().includes(filter))
+      );
+    }
+    
+    if (status_filter) {
+      filtered = filtered.filter(row => row.status === status_filter);
+    }
+    
+    if (company_filter) {
+      filtered = filtered.filter(row => 
+        row.company_id && row.company_id.toString() === company_filter.toString()
+      );
+    }
+    
+    return filtered;
+  };
   
-  // Apply filters
-  if (subnet_filter) {
-    subnetQuery += ` AND (s.network LIKE ? OR s.description LIKE ?)`;
-    deletedSubnetQuery += ` AND (COALESCE(JSON_EXTRACT(al.old_values, '$.network'), JSON_EXTRACT(al.new_values, '$.network')) LIKE ? OR COALESCE(JSON_EXTRACT(al.old_values, '$.description'), JSON_EXTRACT(al.new_values, '$.description')) LIKE ?)`;
-    params.push(`%${subnet_filter}%`, `%${subnet_filter}%`);
-    countParams.push(`%${subnet_filter}%`, `%${subnet_filter}%`);
-  }
-  
-  if (company_filter) {
-    subnetQuery += ` AND s.company_id = ?`;
-    deletedSubnetQuery += ` AND CAST(COALESCE(JSON_EXTRACT(al.old_values, '$.company_id'), JSON_EXTRACT(al.new_values, '$.company_id')) AS INTEGER) = ?`;
-    params.push(company_filter);
-    countParams.push(company_filter);
-  }
-  
-  // Combine queries based on status filter
-  let finalQuery;
-  if (status_filter === 'active') {
-    finalQuery = subnetQuery + ` ORDER BY s.created_date DESC LIMIT ? OFFSET ?`;
-  } else if (status_filter === 'deleted') {
-    finalQuery = deletedSubnetQuery + ` ORDER BY deleted_date DESC LIMIT ? OFFSET ?`;
-  } else {
-    finalQuery = `(${subnetQuery}) UNION ALL (${deletedSubnetQuery}) ORDER BY last_activity DESC LIMIT ? OFFSET ?`;
-  }
-  
-  params.push(parseInt(limit), parseInt(offset));
-  
-  // Count query for pagination
-  let countQuery;
-  if (status_filter === 'active') {
-    countQuery = `SELECT COUNT(*) as total FROM subnets s LEFT JOIN companies c ON s.company_id = c.id WHERE 1=1`;
-  } else if (status_filter === 'deleted') {
-    countQuery = `SELECT COUNT(DISTINCT al.entity_id) as total FROM audit_logs al WHERE al.action = 'DELETE_SUBNET' AND al.entity_id NOT IN (SELECT CAST(id AS TEXT) FROM subnets)`;
-  } else {
-    countQuery = `SELECT 
-      (SELECT COUNT(*) FROM subnets s LEFT JOIN companies c ON s.company_id = c.id WHERE 1=1) +
-      (SELECT COUNT(DISTINCT al.entity_id) FROM audit_logs al WHERE al.action = 'DELETE_SUBNET' AND al.entity_id NOT IN (SELECT CAST(id AS TEXT) FROM subnets))
-      as total`;
-  }
-  
-  // Apply the same filters to count query
-  if (subnet_filter && status_filter !== 'deleted') {
-    countQuery += ` AND (s.network LIKE ? OR s.description LIKE ?)`;
-  }
-  if (company_filter && status_filter !== 'deleted') {
-    countQuery += ` AND s.company_id = ?`;
-  }
-  
-  // Get total count
-  db.get(countQuery, countParams, (err, countResult) => {
+  // Execute the main query
+  db.all(query, [], (err, allRows) => {
     if (err) {
-      console.error('Błąd w zapytaniu count dla subnet-history:', err.message);
-      console.error('CountQuery:', countQuery);
-      console.error('CountParams:', countParams);
+      console.error('Błąd w zapytaniu subnet-history:', err.message);
       res.status(500).json({ error: err.message });
       return;
     }
     
-    // Get the actual data
-    db.all(finalQuery, params, (err, rows) => {
-      if (err) {
-        console.error('Błąd w zapytaniu finalQuery dla subnet-history:', err.message);
-        console.error('FinalQuery:', finalQuery);
-        console.error('Params:', params);
-        res.status(500).json({ error: err.message });
-        return;
-      }
-      
-      res.json({
-        subnets: rows,
-        total: countResult.total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(countResult.total / limit)
-      });
+    // Apply filters
+    const filteredRows = applyFilters(allRows);
+    
+    // Sort by last activity (newest first)
+    filteredRows.sort((a, b) => {
+      const dateA = new Date(a.last_activity || a.created_date || 0);
+      const dateB = new Date(b.last_activity || b.created_date || 0);
+      return dateB - dateA;
+    });
+    
+    // Apply pagination
+    const total = filteredRows.length;
+    const paginatedRows = filteredRows.slice(offset, offset + parseInt(limit));
+    
+    res.json({
+      subnets: paginatedRows,
+      total: total,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      totalPages: Math.ceil(total / limit)
     });
   });
 });
@@ -1490,21 +1467,21 @@ app.get('/api/subnet-history/:id', requireAuth, (req, res) => {
 
 // Statystyki - tylko podsieci
 app.get('/api/stats', requireAuth, (req, res) => {
-  // Получаем общую статистику
+  // Pobieramy ogólne statystyki
   db.get(`SELECT COUNT(*) as total_subnets FROM subnets`, (err, totalResult) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
     
-    // Получаем количество свободных подсетей (company_id = 2 или NULL)
+    // Pobieramy liczbę wolnych podsieci (company_id = 1 lub NULL)
     db.get(`SELECT COUNT(*) as free_subnets FROM subnets WHERE company_id = 1 OR company_id IS NULL`, (err, freeResult) => {
       if (err) {
         res.status(500).json({ error: err.message });
         return;
       }
       
-      // Получаем количество компаний
+      // Pobieramy liczbę firm
       db.get(`SELECT COUNT(*) as total_companies FROM companies`, (err, companiesResult) => {
         if (err) {
           res.status(500).json({ error: err.message });
@@ -1527,7 +1504,7 @@ app.get('/api/stats', requireAuth, (req, res) => {
   });
 });
 
-// Аналитyка - ogólna statystyka podsieci
+// Analityka - ogólna statystyka podsieci
 app.get('/api/analytics/stats', requireAuth, (req, res) => {
   const { company_id, date_from, date_to } = req.query;
   
@@ -1549,14 +1526,14 @@ app.get('/api/analytics/stats', requireAuth, (req, res) => {
     params.push(date_to + ' 23:59:59');
   }
 
-  // Получаем общую статистику с фильтрами
+  // Pobieramy ogólne statystyki z filtrami
   db.get(`SELECT COUNT(*) as total_subnets FROM subnets s ${whereClause}`, params, (err, totalResult) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
     }
     
-    // Получаем количество свободных подсетей (только с company_id = NULL)
+    // Pobieramy liczbę wolnych podsieci (tylko z company_id = NULL)
     let freeParams = [...params];
     let freeWhere = whereClause + " AND s.company_id IS NULL";
     
@@ -1566,7 +1543,7 @@ app.get('/api/analytics/stats', requireAuth, (req, res) => {
         return;
       }
       
-      // Получаем распределение VLAN
+      // Pobieramy rozkład VLAN
       db.all(`SELECT 
         COALESCE(s.vlan, 'Brak') as vlan, 
         COUNT(*) as count 
@@ -1582,7 +1559,7 @@ app.get('/api/analytics/stats', requireAuth, (req, res) => {
         const free_subnets = freeResult.free_subnets || 0;
         const assigned_subnets = total_subnets - free_subnets;
         
-        // Получаем количество компаний (исключая технические)
+        // Pobieramy liczbę firm (wykluczając techniczne)
         db.get(`SELECT COUNT(*) as total_companies FROM companies WHERE name != 'Wolne'`, (err, companiesResult) => {
           if (err) {
             res.status(500).json({ error: err.message });
@@ -1602,7 +1579,7 @@ app.get('/api/analytics/stats', requireAuth, (req, res) => {
   });
 });
 
-// Аналитика - podsieci według firm
+// Analityka - podsieci według firm
 app.get('/api/analytics/companies', requireAuth, (req, res) => {
   const { date_from, date_to } = req.query;
   
@@ -1637,7 +1614,7 @@ app.get('/api/analytics/companies', requireAuth, (req, res) => {
   });
 });
 
-// Аналитика - aktywność podsieci według miesięcy
+// Analityka - aktywność podsieci według miesięcy
 app.get('/api/analytics/monthly', requireAuth, (req, res) => {
   const { company_id } = req.query;
   
@@ -1665,7 +1642,7 @@ app.get('/api/analytics/monthly', requireAuth, (req, res) => {
   });
 });
 
-// Аналитика - утилизация подсетей
+// Analityka - wykorzystanie podsieci
 app.get('/api/analytics/utilization', requireAuth, (req, res) => {
   const query = `SELECT 
     s.network,
@@ -1689,7 +1666,7 @@ app.get('/api/analytics/utilization', requireAuth, (req, res) => {
 
 // Import firm z Excel
 // Eksport firm do Excel
-// Функция для получения сетевых адресов
+// Funkcja do pobierania adresów sieciowych
 function getNetworkAddresses() {
   const addresses = [];
   const networkInterfaces = os.networkInterfaces();
@@ -1710,42 +1687,42 @@ function getNetworkAddresses() {
 }
 
 app.listen(PORT, HOST, () => {
-  console.log('\n🚀 IP Management System запущен!');
+  console.log('\n🚀 System Zarządzania IP uruchomiony!');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log(`📍 Хост: ${HOST}`);
-  console.log(`🔌 Порт: ${PORT}`);
-  console.log(`🌍 Окружение: ${networkConfig.server.environment}`);
+  console.log(`📍 Host: ${HOST}`);
+  console.log(`🔌 Port: ${PORT}`);
+  console.log(`🌍 Środowisko: ${networkConfig.server.environment}`);
   console.log('');
   
-  // Локальные адреса
-  console.log('🏠 Локальный доступ:');
+  // Adresy lokalne
+  console.log('🏠 Dostęp lokalny:');
   console.log(`   http://localhost:${PORT}`);
   console.log(`   http://127.0.0.1:${PORT}`);
   console.log('');
   
-  // Сетевые адреса
+  // Adresy sieciowe
   const networkAddresses = getNetworkAddresses();
   if (networkAddresses.length > 0) {
-    console.log('🌐 Доступ из локальной сети:');
+    console.log('🌐 Dostęp z sieci lokalnej:');
     networkAddresses.forEach(addr => {
       console.log(`   ${addr.url} (${addr.interface})`);
     });
     console.log('');
-    console.log('💡 Подключайтесь с любого устройства в сети используя эти адреса!');
+    console.log('💡 Łącz się z dowolnego urządzenia w sieci używając tych adresów!');
   } else {
-    console.log('⚠️  Сетевые интерфейсы не найдены');
+    console.log('⚠️  Interfejsy sieciowe nie zostały znalezione');
   }
   
   console.log('');
-  console.log('🔐 Данные для входа:');
-  console.log(`   👤 Логин: ${process.env.ADMIN_USERNAME || 'admin'}`);
-  console.log(`   🔑 Пароль: ${process.env.ADMIN_PASSWORD || 'admin123'}`);
+  console.log('🔐 Dane do logowania:');
+  console.log(`   👤 Login: ${process.env.ADMIN_USERNAME || 'admin'}`);
+  console.log(`   🔑 Hasło: ${process.env.ADMIN_PASSWORD || 'admin123'}`);
   console.log('');
-  console.log('📋 Полезные команды:');
-  console.log('   npm run info     - показать сетевую информацию');
-  console.log('   npm run network  - запуск для сети');
-  console.log('   npm run dev      - режим разработки');
+  console.log('📋 Przydatne komendy:');
+  console.log('   npm run info     - pokaż informacje sieciowe');
+  console.log('   npm run network  - uruchom dla sieci');
+  console.log('   npm run dev      - tryb deweloperski');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('✅ Готов к работе!\n');
+  console.log('✅ Gotowy do pracy!\n');
 });
 

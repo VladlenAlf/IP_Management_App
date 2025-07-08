@@ -478,6 +478,15 @@ textarea {
     white-space: nowrap;
 }
 
+/* Разрешаем перенос текста в некоторых столбцах */
+#subnetHistoryTable td:nth-child(6),
+#subnetHistoryTable td:nth-child(7),
+#subnetHistoryTable td:nth-child(8) {
+    white-space: normal;
+    word-break: break-word;
+    max-width: 90px;
+}
+
 /* Style dla okna modalnego szczegółów loga */
 .log-detail-section {
     margin-bottom: 25px;
@@ -864,7 +873,7 @@ textarea {
     }
 }
 
-/* Стили для фильтров логов */
+/* Style dla filtrów logów */
 #dateFromFilter,
 #dateToFilter {
     padding: 8px;
@@ -886,7 +895,7 @@ textarea {
     min-width: 150px;
 }
 
-/* Стили для истории подсетей */
+/* Style dla historii podsieci */
 .subnet-info-card {
     background: #f8f9fa;
     border: 1px solid #dee2e6;
@@ -991,18 +1000,79 @@ textarea {
     padding-top: 15px;
 }
 
-/* Улучшения для таблицы истории */
-#subnetHistoryTable th:nth-child(1),
-#detailedHistoryTable th:nth-child(1) {
-    min-width: 120px;
+/* Ulepszenia dla tabeli historii */
+#subnet-history .table-container {
+    overflow-x: auto;
 }
 
-#subnetHistoryTable th:nth-child(2),
-#detailedHistoryTable th:nth-child(2) {
-    min-width: 80px;
+#subnetHistoryTable {
+    font-size: 14px;
+    width: 100%;
+    max-width: 100%;
 }
 
-#subnetHistoryTable th:nth-child(8),
-#detailedHistoryTable th:nth-child(6) {
-    min-width: 100px;
+#subnetHistoryTable th,
+#subnetHistoryTable td {
+    padding: 8px 10px;
+    white-space: nowrap;
+}
+
+#subnetHistoryTable th:nth-child(1) { width: 15%; min-width: 100px; }
+#subnetHistoryTable th:nth-child(2) { width: 8%; min-width: 50px; }
+#subnetHistoryTable th:nth-child(3) { width: 15%; min-width: 100px; }
+#subnetHistoryTable th:nth-child(4) { width: 8%; min-width: 50px; text-align: center; }
+#subnetHistoryTable th:nth-child(5) { width: 10%; min-width: 70px; text-align: center; }
+#subnetHistoryTable th:nth-child(6) { width: 14%; min-width: 90px; }
+#subnetHistoryTable th:nth-child(7) { width: 14%; min-width: 90px; }
+#subnetHistoryTable th:nth-child(8) { width: 14%; min-width: 90px; }
+#subnetHistoryTable th:nth-child(9) { width: 12%; min-width: 70px; text-align: center; }
+
+#subnetHistoryTable td:nth-child(4),
+#subnetHistoryTable td:nth-child(5),
+#subnetHistoryTable td:nth-child(9) {
+    text-align: center;
+}
+
+/* Компактное отображение дат */
+.compact-date {
+    font-size: 12px;
+    color: #666;
+}
+
+/* Paginacja dla historii */
+#historyPagination {
+    margin-top: 15px;
+    text-align: center;
+    padding: 10px;
+    border-top: 1px solid #dee2e6;
+    background: #f8f9fa;
+}
+
+#historyPagination span {
+    color: #666;
+    font-size: 14px;
+}
+
+/* Фильтры истории */
+#subnet-history .filters {
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Ограничение ширины вкладки истории подсетей */
+#subnet-history {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+#subnet-history h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 20px;
+}
+
+#subnet-history p {
+    margin-bottom: 15px;
+    color: #666;
+    font-size: 14px;
 }
