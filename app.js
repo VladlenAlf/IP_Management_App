@@ -9,6 +9,12 @@ let logsFilters = {};
 // Zmienne globalne dla wykresów
 let charts = {};
 
+// Zmienne globalne dla historii podsieci
+let subnetHistory = [];
+let currentHistoryPage = 1;
+let historyFilters = {};
+let currentDetailedHistory = null;
+
 // Funkcje API
 const API = {
     async checkAuth() {
@@ -198,6 +204,35 @@ const API = {
             throw new Error(result.error || 'Błąd aktualizacji firmy');
         }
         return result;
+    },
+
+    // Subnet History API calls
+    async fetchSubnetHistory(page = 1, filters = {}) {
+        const params = new URLSearchParams({
+            page: page.toString(),
+            limit: '20'
+        });
+        
+        Object.keys(filters).forEach(key => {
+            if (filters[key] !== '' && filters[key] !== null && filters[key] !== undefined) {
+                params.append(key, filters[key]);
+            }
+        });
+        
+        const response = await fetch(`/api/subnet-history?${params}`);
+        return response.json();
+    },
+
+    async fetchSubnetDetailedHistory(subnetId, filters = {}) {
+        const params = new URLSearchParams();
+        Object.keys(filters).forEach(key => {
+            if (filters[key] !== '' && filters[key] !== null && filters[key] !== undefined) {
+                params.append(key, filters[key]);
+            }
+        });
+        
+        const response = await fetch(`/api/subnet-history/${subnetId}?${params}`);
+        return response.json();
     }
 };
 
@@ -206,7 +241,7 @@ async function deleteCompany(id) {
     const company = companies.find(c => c.id === id);
     if (!company) return;
     
-    // Защита системной фирмы "Wolne"
+    // Защита системной фирмы "Wolне"
     if (company.name === 'Wolne' || id === 1) {
         showMessage('Nie można usunąć firmy systemowej "Wolne"', 'error');
         return;
@@ -244,7 +279,7 @@ async function checkAuthAndInit() {
         currentUser = authStatus.user;
         updateUserInfo();
         
-        // Сначала загружаем компании, затем подсети и статистику
+        // Сначала загружаем компании, затем подсети i статистику
         await loadCompanies();
         await loadSubnets();
         await loadStats();
@@ -592,15 +627,35 @@ function showAddSubnetModal() {
     document.getElementById('subnetId').value = '';
     updateCompanyOptions();
     document.getElementById('subnetModal').style.display = 'block';
+    
+    // Устанавливаем обработчик события для формы
+    setupSubnetFormHandler();
 }
 
 function showAddCompanyModal() {
     document.getElementById('companyModalTitle').textContent = 'Dodaj firmę';
     document.getElementById('companyForm').reset();
     document.getElementById('companyModal').style.display = 'block';
+    
+    // Устанавливаем обработчик события для формы
+    setupCompanyFormHandler();
 }
 
 function showDivideSubnetModal() {
+    const select = document.getElementById('divideSubnetSelect');
+    const newMaskField = document.getElementById('newMask');
+    
+    // Восстанавливаем возможность выбора
+    select.disabled = false;
+    newMaskField.min = 1;
+    newMaskField.max = 30;
+    
+    // Удаляем подсказку о текущей маске
+    const hintElement = document.querySelector('.current-mask-hint');
+    if (hintElement) {
+        hintElement.remove();
+    }
+    
     updateDivideSubnetOptions();
     document.getElementById('divideSubnetModal').style.display = 'block';
 }
@@ -617,6 +672,28 @@ function showAssignFreeSubnetsModal() {
 
 function closeModal(modalId) {
     document.getElementById(modalId).style.display = 'none';
+    
+    // Если закрываем модальное окно разделения, восстанавливаем исходное состояние
+    if (modalId === 'divideSubnetModal') {
+        const select = document.getElementById('divideSubnetSelect');
+        const newMaskField = document.getElementById('newMask');
+        
+        if (select) {
+            select.disabled = false;
+            select.innerHTML = '<option value="">Wybierz podsieć</option>';
+        }
+        if (newMaskField) {
+            newMaskField.min = 1;
+            newMaskField.max = 30;
+            newMaskField.value = '';
+        }
+        
+        // Удаляем подсказку о текущей маске
+        const hintElement = document.querySelector('.current-mask-hint');
+        if (hintElement) {
+            hintElement.remove();
+        }
+    }
 }
 
 // Редактирование подсети
@@ -634,6 +711,28 @@ function editSubnet(id) {
     
     updateCompanyOptions();
     document.getElementById('subnetModal').style.display = 'block';
+    
+    // Устанавливаем обработчик события для формы
+    setupSubnetFormHandler();
+}
+
+// Редактирование компании
+function editCompany(id) {
+    const company = companies.find(c => c.id === id);
+    if (!company) {
+        showMessage('Nie znaleziono firmy', 'error');
+        return;
+    }
+
+    document.getElementById('companyModalTitle').textContent = 'Edytuj firmę';
+    document.getElementById('companyId').value = company.id;
+    document.getElementById('companyName').value = company.name;
+    document.getElementById('companyDescription').value = company.description || '';
+    
+    document.getElementById('companyModal').style.display = 'block';
+    
+    // Устанавливаем обработчик события для формы
+    setupCompanyFormHandler();
 }
 
 // Обновление опций компаний
@@ -750,17 +849,23 @@ function showTab(tabName) {
         loadAuditLogs();
     } else if (tabName === 'analytics') {
         loadAnalytics();
+    } else if (tabName === 'subnet-history') {
+        loadSubnetHistory();
     }
     
     currentTab = tabName;
 }
 
-// Настройка обработчиков событий
-function setupEventListeners() {
-    // Форма добавления/редактирования подсети
+// Обработчик формы подсети
+function setupSubnetFormHandler() {
     const subnetForm = document.getElementById('subnetForm');
     if (subnetForm) {
-        subnetForm.addEventListener('submit', async function(e) {
+        // Удаляем старые обработчики
+        const newForm = subnetForm.cloneNode(true);
+        subnetForm.parentNode.replaceChild(newForm, subnetForm);
+        
+        // Добавляем новый обработчик
+        newForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const networkInput = document.getElementById('subnetNetwork').value.trim();
@@ -812,11 +917,18 @@ function setupEventListeners() {
             }
         });
     }
-    
-    // Форма добавления компании
+}
+
+// Обработчик формы компании
+function setupCompanyFormHandler() {
     const companyForm = document.getElementById('companyForm');
     if (companyForm) {
-        companyForm.addEventListener('submit', async function(e) {
+        // Удаляем старые обработчики
+        const newForm = companyForm.cloneNode(true);
+        companyForm.parentNode.replaceChild(newForm, companyForm);
+        
+        // Добавляем новый обработчик
+        newForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const companyData = {
@@ -844,6 +956,12 @@ function setupEventListeners() {
             }
         });
     }
+}
+
+// Настройка обработчиков событий
+function setupEventListeners() {
+    setupSubnetFormHandler();
+    setupCompanyFormHandler();
     
     // Форма разделения подсети
     const divideForm = document.getElementById('divideSubnetForm');
@@ -864,13 +982,13 @@ function setupEventListeners() {
                 if (result.error) {
                     showMessage(result.error, 'error');
                 } else {
-                    showMessage(`Pomyślnie podzielono podsieć na ${result.created_count} mniejszych`, 'success');
+                    showMessage(`Pomyślnie podzielono podsieć na ${result.created_count} мniejszych`, 'success');
                     closeModal('divideSubnetModal');
                     loadSubnets();
                     loadStats();
                 }
             } catch (error) {
-                showMessage('Błąd podczas podziału podsieci', 'error');
+                showMessage('Błąd podczas podziału подсети', 'error');
             }
         });
     }
@@ -885,7 +1003,7 @@ function setupEventListeners() {
             const subnetIds = Array.from(checkedBoxes).map(cb => parseInt(cb.dataset.subnetId));
             
             if (subnetIds.length < 2) {
-                showMessage('Należy wybrać co najmniej 2 podsieci do połączenia', 'error');
+                showMessage('Należy wybrać co najmniej 2 подсети do połącения', 'error');
                 return;
             }
             
@@ -900,7 +1018,7 @@ function setupEventListeners() {
                     loadStats();
                 }
             } catch (error) {
-                showMessage('Błąd podczas łączenia podsieci', 'error');
+                showMessage('Błąd podczas łączenia подсетей', 'error');
             }
         });
     }
@@ -1075,10 +1193,10 @@ async function importExcel() {
         
         if (result.errors && result.errors.length > 0) {
             console.warn('Błędy importu:', result.errors);
-            showMessage(`Import zakończony z ${result.errors.length} błędami. Sprawdź konsolę.`, 'warning');
+            showMessage(`Import zakończony z ${result.errors.length} błędami. Sprawdź консоль.`, 'warning');
         }
         
-        // Odświeżamy dane po imporcie podsieci i firm
+        // Odświeżamy dane po импорте подсетей и фирм
         loadSubnets();
         loadCompanies(); // Dodano для обновления списка компаний
         fileInput.value = '';
@@ -1106,7 +1224,7 @@ async function importCompaniesExcel() {
         
         if (result.errors && result.errors.length > 0) {
             console.warn('Błędy importu фирм:', result.errors);
-            showMessage(`Import zakończony z ${result.errors.length} błędami. Sprawdź konsolę.`, 'warning');
+            showMessage(`Import zakończony z ${result.errors.length} błędami. Sprawdź консоль.`, 'warning');
         }
         
         // Odświeżamy listę firm
@@ -1159,7 +1277,32 @@ function calculateBroadcast(network, mask) {
     return parts.join('.');
 }
 
-// Функция удалена - больше не работаем с IP-адресами
+// Утилитарные функции для IP
+function isValidIP(ip) {
+    const regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+    return regex.test(ip);
+}
+
+function normalizeToNetworkAddress(ip, mask) {
+    if (!isValidIP(ip) || !mask || mask < 0 || mask > 32) {
+        return null;
+    }
+    
+    const parts = ip.split('.').map(Number);
+    const maskBits = 0xFFFFFFFF << (32 - mask);
+    
+    const ipInt = (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+    const networkInt = ipInt & maskBits;
+    
+    const networkParts = [
+        (networkInt >>> 24) & 0xFF,
+        (networkInt >>> 16) & 0xFF,
+        (networkInt >>> 8) & 0xFF,
+        networkInt & 0xFF
+    ];
+    
+    return networkParts.join('.');
+}
 
 // Отображение таблицы подсетей
 function renderSubnetsTable() {
@@ -1183,6 +1326,7 @@ function renderSubnetsTable() {
             <td>${new Date(subnet.created_date).toLocaleDateString()}</td>
             <td>
                 <button class="btn btn-small btn-primary" onclick="editSubnet(${subnet.id})">Edytuj</button>
+                <button class="btn btn-small btn-success" onclick="showDivideSubnetModalForId(${subnet.id})">Podziel</button>
                 <button class="btn btn-small btn-danger" onclick="deleteSubnet(${subnet.id})">Usuń</button>
             </td>
         `;
@@ -1245,11 +1389,11 @@ function renderLogsTable(logs) {
             'LOGIN_FAILED': 'Nieudane logowanie',
             'LOGOUT': 'Wylogowanie z systemu',
             'CREATE_SUBNET': 'Tworzenie podsieci',
-            'CREATE_SUBNET_FAILED': 'Błąd tworzenia podsieci',
+            'CREATE_SUBNET_FAILED': 'Błąд tworzenia подсети',
             'UPDATE_SUBNET': 'Modyfikacja podsieci',
             'UPDATE_SUBNET_FAILED': 'Błąд мodyfikacji подсети',
-            'DELETE_SUBNET': 'Usuwanie podsieci',
-            'DELETE_SUBNET_FAILED': 'Błąd usuwania podsieci',
+            'DELETE_SUBNET': 'Usuwanie подсети',
+            'DELETE_SUBNET_FAILED': 'Błąд usuwania подсети',
             'DIVIDE_SUBNET': 'Поделить подсеть',
             'MERGE_SUBNETS': 'Łączenie podsieci',
             'ASSIGN_SUBNETS': 'Przypisanie podsieci',
@@ -1377,11 +1521,11 @@ async function showLogDetails(logId) {
             'LOGIN_FAILED': 'Nieudane logowanie',
             'LOGOUT': 'Wylogowanie z systemu',
             'CREATE_SUBNET': 'Tworzenie podsieci',
-            'CREATE_SUBNET_FAILED': 'Błąd tworzenia podsieci',
+            'CREATE_SUBNET_FAILED': 'Błąд tworzenia подсети',
             'UPDATE_SUBNET': 'Modyfikacja podsieci',
             'UPDATE_SUBNET_FAILED': 'Błąд мodyfikacji подсети',
-            'DELETE_SUBNET': 'Usuwanie podsieci',
-            'DELETE_SUBNET_FAILED': 'Błąd usuwania podsieci',
+            'DELETE_SUBNET': 'Usuwanie подсети',
+            'DELETE_SUBNET_FAILED': 'Błąд usuwania подсети',
             'DIVIDE_SUBNET': 'Поделить подсеть',
             'MERGE_SUBNETS': 'Łączenie podsieci',
             'ASSIGN_SUBNETS': 'Przypisanie podsieci',
@@ -1471,11 +1615,9 @@ function updateSubnetFilters() {
     });
 }
 
-// Функция удалена - больше не работаем с IP-адресами
-
 // Удаление подсети
 async function deleteSubnet(id) {
-    if (!confirm('Czy na pewno chcesz usunąć tę podsieć?')) {
+    if (!confirm('Czy na pewno chcesz usunąć эту подсеть?')) {
         return;
     }
     
@@ -1498,6 +1640,20 @@ function showAddCompanyModal() {
 }
 
 function showDivideSubnetModal() {
+    const select = document.getElementById('divideSubnetSelect');
+    const newMaskField = document.getElementById('newMask');
+    
+    // Восстанавливаем возможность выбора
+    select.disabled = false;
+    newMaskField.min = 1;
+    newMaskField.max = 30;
+    
+    // Удаляем подсказку о текущей маске
+    const hintElement = document.querySelector('.current-mask-hint');
+    if (hintElement) {
+        hintElement.remove();
+    }
+    
     updateDivideSubnetOptions();
     document.getElementById('divideSubnetModal').style.display = 'block';
 }
@@ -1512,92 +1668,953 @@ function showAssignFreeSubnetsModal() {
     document.getElementById('assignFreeSubnetsModal').style.display = 'block';
 }
 
-// Legacy aliases for compatibility
-function openCompanyModal() { showAddCompanyModal(); }
-function openDivideModal() { showDivideSubnetModal(); }
-function openMergeModal() { showMergeSubnetsModal(); }
-function openAssignModal() { showAssignFreeSubnetsModal(); }
+// Функция для открытия модального окна разделения для конкретной подсети
+function showDivideSubnetModalForId(subnetId) {
+    // Находим подсеть по ID
+    const subnet = subnets.find(s => s.id === subnetId);
+    if (!subnet) {
+        showMessage('Не найдена подсеть для разделения', 'error');
+        return;
+    }
 
-// Функция фильтрации подсетей
-function filterSubnets() {
-    const searchTerm = document.getElementById('searchInput')?.value.toLowerCase() || '';
-    const companyFilter = document.getElementById('companyFilter')?.value || '';
+    // Заполняем модальное окно данными о выбранной подсети
+    const modal = document.getElementById('divideSubnetModal');
+    const form = document.getElementById('divideSubnetForm');
+    const select = document.getElementById('divideSubnetSelect');
+    const newMaskField = document.getElementById('newMask');
     
-    const filteredSubnets = subnets.filter(subnet => {
-        const matchesSearch = !searchTerm || 
-            subnet.network.toLowerCase().includes(searchTerm) ||
-            (subnet.description && subnet.description.toLowerCase().includes(searchTerm));
-        
-        const matchesCompany = !companyFilter || 
-            (companyFilter === 'free' && !subnet.company_id) ||
-            (subnet.company_id && subnet.company_id.toString() === companyFilter);
-        
-        return matchesSearch && matchesCompany;
-    });
+    // Очищаем select и добавляем только выбранную подсеть
+    select.innerHTML = '';
+    const option = document.createElement('option');
+    option.value = subnet.id;
+    option.textContent = `${subnet.network}/${subnet.mask}`;
+    if (subnet.company_name) {
+        option.textContent += ` (${subnet.company_name})`;
+    }
+    option.selected = true;
+    select.appendChild(option);
     
-    renderFilteredSubnetsTable(filteredSubnets);
+    // Делаем select недоступным для изменения, поскольку подсеть уже выбрана
+    select.disabled = true;
+    
+    // Устанавливаем минимальное значение маски (больше текущей)
+    newMaskField.min = subnet.mask + 1;
+    newMaskField.max = 30;
+    newMaskField.value = '';
+    
+    // Добавляем подсказку о текущей маске
+    let hintElement = document.querySelector('.current-mask-hint');
+    if (!hintElement) {
+        hintElement = document.createElement('small');
+        hintElement.className = 'current-mask-hint';
+        hintElement.style.display = 'block';
+        hintElement.style.color = '#666';
+        hintElement.style.marginTop = '5px';
+        newMaskField.parentNode.appendChild(hintElement);
+    }
+    hintElement.textContent = `Текущая маска: /${subnet.mask}. Новая маска должна быть больше.`;
+    
+    // Показываем модальное окно
+    modal.style.display = 'block';
 }
 
-// Функция отображения отфильтрованной таблицы подсетей
-function renderFilteredSubnetsTable(filteredSubnets) {
-    const tbody = document.querySelector('#subnetTable tbody');
+// Модифицируем существующую функцию для восстановления оригинального поведения
+function showDivideSubnetModal() {
+    const select = document.getElementById('divideSubnetSelect');
+    const newMaskField = document.getElementById('newMask');
+    
+    // Восстанавливаем возможность выбора
+    select.disabled = false;
+    newMaskField.min = 1;
+    newMaskField.max = 30;
+    
+    // Удаляем подсказку о текущей маске
+    const hintElement = document.querySelector('.current-mask-hint');
+    if (hintElement) {
+        hintElement.remove();
+    }
+    
+    updateDivideSubnetOptions();
+    document.getElementById('divideSubnetModal').style.display = 'block';
+}
+
+// ==========================================
+// SUBNET HISTORY FUNCTIONS
+// ==========================================
+
+// Ładowanie historii podsieci
+async function loadSubnetHistory(page = 1, filters = {}) {
+    try {
+        currentHistoryPage = page;
+        historyFilters = filters;
+        
+        const result = await API.fetchSubnetHistory(page, filters);
+        subnetHistory = result.subnets || [];
+        
+        renderSubnetHistoryTable();
+        renderHistoryPagination(result);
+        updateHistoryCompanyFilter();
+        
+    } catch (error) {
+        console.error('Błąd во время ładowania historii podsieci:', error);
+        showMessage('Błąd во время ładowania historii podsieci', 'error');
+    }
+}
+
+// Renderowanie таблицы истории подсетей
+function renderSubnetHistoryTable() {
+    const tbody = document.querySelector('#subnetHistoryTable tbody');
+    if (!tbody) return;
+    
     tbody.innerHTML = '';
 
-    filteredSubnets.forEach(subnet => {
-        const availableIps = Math.pow(2, 32 - subnet.mask) - 2;
+    subnetHistory.forEach(subnet => {
+        const row = document.createElement('tr');
+        const statusClass = subnet.status === 'active' ? 'active' : 'deleted';
         const companyName = subnet.company_name || 'Wolna';
         const vlan = subnet.vlan || '-';
+        const deletedDate = subnet.deleted_date ? new Date(subnet.deleted_date).toLocaleDateString() : '-';
+        const lastActivity = subnet.last_activity ? new Date(subnet.last_activity).toLocaleDateString() : '-';
         
-        const row = document.createElement('tr');
         row.innerHTML = `
-            <td><input type="checkbox" data-subnet-id="${subnet.id}"></td>
             <td>${subnet.network}</td>
             <td>/${subnet.mask}</td>
-            <td>${availableIps}</td>
             <td>${companyName}</td>
             <td>${vlan}</td>
-            <td>${subnet.description || '-'}</td>
+            <td><span class="status-badge ${statusClass}">${subnet.status === 'active' ? 'Aktywna' : 'Usunięta'}</span></td>
             <td>${new Date(subnet.created_date).toLocaleDateString()}</td>
+            <td>${deletedDate}</td>
+            <td>${lastActivity}</td>
             <td>
-                <button class="btn btn-small btn-primary" onclick="editSubnet(${subnet.id})">Edytuj</button>
-                <button class="btn btn-small btn-danger" onclick="deleteSubnet(${subnet.id})">Usuń</button>
+                <button class="btn btn-small btn-primary" onclick="showSubnetDetailedHistory(${subnet.id})">Historia</button>
             </td>
         `;
         tbody.appendChild(row);
     });
 }
 
-// Функция для переключения выбора всех подсетей  
-function toggleAllSubnets() {
-    const selectAllCheckbox = document.getElementById('selectAllSubnets');
-    const checkboxes = document.querySelectorAll('#subnetTable input[type="checkbox"]:not(#selectAllSubnets)');
+// Renderowanie пагинации для истории
+function renderHistoryPagination(result) {
+    const pagination = document.getElementById('historyPagination');
+    if (!pagination) return;
     
-    checkboxes.forEach(checkbox => {
-        checkbox.checked = selectAllCheckbox.checked;
+    pagination.innerHTML = '';
+    
+    if (result.totalPages <= 1) return;
+    
+    // Previous button
+    if (result.page > 1) {
+        const prevBtn = document.createElement('button');
+        prevBtn.textContent = 'Poprzednia';
+        prevBtn.className = 'btn btn-secondary';
+        prevBtn.onclick = () => loadSubnetHistory(result.page - 1, historyFilters);
+        pagination.appendChild(prevBtn);
+    }
+    
+    // Page info
+    const pageInfo = document.createElement('span');
+    pageInfo.textContent = `Strona ${result.page} z ${result.totalPages}`;
+    pageInfo.style.margin = '0 15px';
+    pagination.appendChild(pageInfo);
+    
+    // Next button
+    if (result.page < result.totalPages) {
+        const nextBtn = document.createElement('button');
+        nextBtn.textContent = 'Następna';
+        nextBtn.className = 'btn btn-secondary';
+        nextBtn.onclick = () => loadSubnetHistory(result.page + 1, historyFilters);
+        pagination.appendChild(nextBtn);
+    }
+}
+
+// Обновление фильтра компаний в истории
+function updateHistoryCompanyFilter() {
+    const select = document.getElementById('historyCompanyFilter');
+    if (!select) return;
+    
+    // Clear existing options except first
+    select.innerHTML = '<option value="">Wszystkie firmy</option>';
+    
+    companies.forEach(company => {
+        const option = document.createElement('option');
+        option.value = company.id;
+        option.textContent = company.name;
+        select.appendChild(option);
     });
+}
+
+// Filtrowanie historii podsieci
+function filterSubnetHistory() {
+    const subnetFilter = document.getElementById('historySubnetFilter')?.value || '';
+    const statusFilter = document.getElementById('historyStatusFilter')?.value || '';
+    const companyFilter = document.getElementById('historyCompanyFilter')?.value || '';
     
-    updateSelectedSubnetsForMerge();
-}
-
-// Функция для редактирования компании
-function editCompany(id) {
-    const company = companies.find(c => c.id === id);
-    if (!company) return;
-
-    document.getElementById('companyModalTitle').textContent = 'Edytuj firmę';
-    document.getElementById('companyId').value = company.id;
-    document.getElementById('companyName').value = company.name;
-    document.getElementById('companyDescription').value = company.description || '';
+    const filters = {
+        subnet_filter: subnetFilter,
+        status_filter: statusFilter,
+        company_filter: companyFilter
+    };
     
-    document.getElementById('companyModal').style.display = 'block';
+    loadSubnetHistory(1, filters);
 }
 
-// Функция обновления логов
-function refreshLogs() {
-    loadAuditLogs(1, logsFilters);
+// Reset фильтров истории
+function resetSubnetHistoryFilters() {
+    document.getElementById('historySubnetFilter').value = '';
+    document.getElementById('historyStatusFilter').value = '';
+    document.getElementById('historyCompanyFilter').value = '';
+    
+    loadSubnetHistory(1, {});
 }
 
-// Функция фильтрации логов
+// Pokazanie szczegółовой истории подсети
+async function showSubnetDetailedHistory(subnetId) {
+    try {
+        const result = await API.fetchSubnetDetailedHistory(subnetId);
+        currentDetailedHistory = result;
+        
+        // Актуализация информации о подсети
+        updateSubnetHistoryInfo(result.subnet);
+        
+        // Рендеринг истории
+        renderDetailedHistoryTable(result.history);
+        
+        // Сброс фильтров
+        resetDetailedHistoryFilters();
+        
+        // Показ модального окна
+        document.getElementById('subnetDetailedHistoryModal').style.display = 'block';
+        
+    } catch (error) {
+        console.error('Błąd во время ładowania szczegółовой истории:', error);
+        showMessage('Błąд во время ładowania szczegółовой истории подсети', 'error');
+    }
+}
+
+// Актуализация информации о подсети в модальном окне
+function updateSubnetHistoryInfo(subnet) {
+    const infoContainer = document.getElementById('subnetHistoryInfo');
+    const titleElement = document.getElementById('subnetHistoryModalTitle');
+    
+    if (!subnet) {
+        infoContainer.innerHTML = '<p>Nie znaleziono информации о подсети</p>';
+        titleElement.textContent = 'Historia подсети';
+        return;
+    }
+    
+    titleElement.textContent = `Historia подсети ${subnet.network}/${subnet.mask}`;
+    
+    const statusClass = subnet.status === 'active' ? 'active' : 'deleted';
+    const statusText = subnet.status === 'active' ? 'Aktywna' : 'Usunięta';
+    
+    infoContainer.innerHTML = `
+        <div class="subnet-info-grid">
+            <div class="subnet-info-item">
+                <div class="subnet-info-label">Adres sieci</div>
+                <div class="subnet-info-value">${subnet.network}/${subnet.mask}</div>
+            </div>
+            <div class="subnet-info-item">
+                <div class="subnet-info-label">Status</div>
+                <div class="subnet-info-value"><span class="status-badge ${statusClass}">${statusText}</span></div>
+            </div>
+            <div class="subnet-info-item">
+                <div class="subnet-info-label">Firma</div>
+                <div class="subnet-info-value">${subnet.company_name || 'Wolna'}</div>
+            </div>
+            <div class="subnet-info-item">
+                <div class="subnet-info-label">VLAN</div>
+                <div class="subnet-info-value">${subnet.vlan || '-'}</div>
+            </div>
+            <div class="subnet-info-item">
+                <div class="subnet-info-label">Data utworzenia</div>
+                <div class="subnet-info-value">${new Date(subnet.created_date).toLocaleString()}</div>
+            </div>
+            <div class="subnet-info-item">
+                <div class="subnet-info-label">Opis</div>
+                <div class="subnet-info-value">${subnet.description || '-'}</div>
+            </div>
+        </div>
+    `;
+}
+
+// Renderowanie таблицы szczegółовой истории
+function renderDetailedHistoryTable(history) {
+    const tbody = document.querySelector('#detailedHistoryTable tbody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+
+    history.forEach(log => {
+        const row = document.createElement('tr');
+        
+        // Parse old and new values
+        let oldValues = '';
+        let newValues = '';
+        let details = '';
+        
+        try {
+            if (log.old_values) {
+                const old = JSON.parse(log.old_values);
+                oldValues = Object.entries(old).map(([k,v]) => `${translateFieldName(k)}: ${v}`).join('; ');
+            }
+            if (log.new_values) {
+                const new_val = JSON.parse(log.new_values);
+                newValues = Object.entries(new_val).map(([k,v]) => `${translateFieldName(k)}: ${v}`).join('; ');
+            }
+            details = formatActionDetails(log.action, log.old_values, log.new_values);
+        } catch (e) {
+            oldValues = log.old_values || '-';
+            newValues = log.new_values || '-';
+            details = translateAction(log.action);
+        }
+        
+        row.innerHTML = `
+            <td>${new Date(log.created_date).toLocaleString()}</td>
+            <td>${log.username || 'System'}</td>
+            <td><span class="action-badge action-${log.action.toLowerCase()}">${translateAction(log.action)}</span></td>
+            <td class="history-details">${details}</td>
+            <td class="history-changes">${oldValues}</td>
+            <td class="history-changes">${newValues}</td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Formatowanie wartości для истории
+function formatHistoryValues(values) {
+    if (!values) return '-';
+    
+    // Если это массив объектов (например, массив подсетей)
+    if (Array.isArray(values)) {
+        const formatted = values.map((item, index) => {
+            if (typeof item === 'object' && item !== null) {
+                // Специальная обработка для объектов подсетей
+                if (item.network && item.mask) {
+                    return `${index + 1}. ${item.network}/${item.mask}${item.company_name ? ` (${item.company_name})` : ''}`;
+                }
+                // Общая обработка объектов
+                const objFormatted = [];
+                for (const [key, value] of Object.entries(item)) {
+                    if (value !== null && value !== undefined && value !== '') {
+                        const translatedKey = translateFieldName(key);
+                        objFormatted.push(`${translatedKey}: ${value}`);
+                    }
+                }
+                return `${index + 1}. ${objFormatted.join(', ')}`;
+            }
+            return `${index + 1}. ${item}`;
+        });
+        return formatted.join('<br>') || '-';
+    }
+    
+    // Если это объект
+    if (typeof values === 'object') {
+        const formatted = [];
+        for (const [key, value] of Object.entries(values)) {
+            if (value !== null && value !== undefined && value !== '') {
+                const translatedKey = translateFieldName(key);
+                // Если значение - массив или объект, преобразуем его
+                let displayValue = value;
+                if (Array.isArray(value)) {
+                    displayValue = value.join(', ');
+                } else if (typeof value === 'object') {
+                    displayValue = JSON.stringify(value);
+                }
+                formatted.push(`${translatedKey}: ${displayValue}`);
+            }
+        }
+        return formatted.join('<br>') || '-';
+    }
+    
+    return values.toString() || '-';
+}
+
+// Formatowanie szczeg detalles akcji
+function formatActionDetails(action, oldValues, newValues) {
+    const actionText = translateAction(action);
+    
+    try {
+        const old = oldValues ? JSON.parse(oldValues) : {};
+        const new_val = newValues ? JSON.parse(newValues) : {};
+        
+        switch(action) {
+            case 'CREATE_SUBNET':
+                return `Utworzono podsieć ${new_val.network}/${new_val.mask}`;
+            case 'UPDATE_SUBNET':
+                const changes = [];
+                if (old.network !== new_val.network || old.mask !== new_val.mask) {
+                    changes.push(`Adres: ${old.network}/${old.mask} → ${new_val.network}/${new_val.mask}`);
+                }
+                if (old.company_id !== new_val.company_id) {
+                    changes.push(`Firma zmieniona`);
+                }
+                if (old.vlan !== new_val.vlan) {
+                    changes.push(`VLAN: ${old.vlan || '-'} → ${new_val.vlan || '-'}`);
+                }
+                if (old.description !== new_val.description) {
+                    changes.push(`Opis zmieniony`);
+                }
+                return changes.join(', ') || actionText;
+            case 'DELETE_SUBNET':
+                return `Usunięto podsieć ${old.network}/${old.mask}`;
+            case 'DIVIDE_SUBNET':
+                return `Podzielono na ${new_val.created_subnets || '?'} podsieci z маскą /${new_val.new_mask}`;
+            case 'MERGE_SUBNETS':
+                if (Array.isArray(old)) {
+                    const subnetList = old.map(subnet => `${subnet.network}/${subnet.mask}`).join(', ');
+                    return `Połączono podsieci: ${subnetList}`;
+                } else {
+                    return `Połączono ${Object.keys(old).length || '?'} podsieci`;
+                }
+            default:
+                return actionText;
+        }
+    } catch (e) {
+        return actionText;
+    }
+}
+
+// Tłumaczenie названий полей
+function translateFieldName(fieldName) {
+    const translations = {
+        'network': 'Sieć',
+        'mask': 'Maska',
+        'company_id': 'ID Firmy',
+        'vlan': 'VLAN',
+        'description': 'Opis',
+        'created_subnets': 'Utworzone podsieci',
+        'new_mask': 'Nowa маска'
+    };
+    
+    return translations[fieldName] || fieldName;
+}
+
+// Тłumaczenie акций
+function translateAction(action) {
+    const actionMap = {
+        'LOGIN_SUCCESS': 'Logowanie do systemu',
+        'LOGIN_FAILED': 'Nieudane logowanie',
+        'LOGOUT': 'Wylogowanie z systemu',
+        'CREATE_SUBNET': 'Tworzenie podsieci',
+        'CREATE_SUBNET_FAILED': 'Błąd tworzenia подсети',
+        'UPDATE_SUBNET': 'Modyfikacja podsieci',
+        'UPDATE_SUBNET_FAILED': 'Błąд мodyfikacji подсети',
+        'DELETE_SUBNET': 'Usuwanie подсети',
+        'DELETE_SUBNET_FAILED': 'Błąд usuwania подсети',
+        'DIVIDE_SUBNET': 'Поделить подсеть',
+        'MERGE_SUBNETS': 'Łączenie podsieci',
+        'ASSIGN_SUBNETS': 'Przypisanie подсети',
+        'ASSIGN_FREE_SUBNETS': 'Przypisanie wolnych подсетей',
+        'ASSIGN_FREE_SUBNETS_FAILED': 'Błąd przypisania wolnych подсетей',
+        'CREATE_COMPANY': 'Tworzenie firmy',
+        'CREATE_COMPANY_FAILED': 'Błąd tworzenia firmy',
+        'UPDATE_COMPANY': 'Modyfikacja firmy',
+        'UPDATE_COMPANY_FAILED': 'Błąd modyfikacji firmy',
+        'DELETE_COMPANY': 'Usuwanie firmy',
+        'DELETE_COMPANY_FAILED': 'Błąd usuwania firmy',
+        'IMPORT_EXCEL': 'Import z Excel',
+        'IMPORT_EXCEL_FAILED': 'Błąd importu z Excel',
+        'EXPORT_EXCEL': 'Eksport do Excel',
+        'EXPORT_EXCEL_FAILED': 'Błąd eksportu do Excel'
+    };
+    
+    return actionMap[action] || action;
+}
+
+// Экспорт истории подсетей
+async function exportSubnetHistory() {
+    try {
+        // Get all subnet history data without pagination
+        const filters = {
+            ...historyFilters,
+            limit: 10000  // Large limit to get all data
+        };
+        
+        const result = await API.fetchSubnetHistory(1, filters);
+        
+        if (!result.subnets || result.subnets.length === 0) {
+            showMessage('Brak danych do eksportu', 'error');
+            return;
+        }
+        
+        // Prepare data for export
+        const exportData = result.subnets.map(subnet => ({
+            'Adres sieci': subnet.network,
+            'Maska': `/${subnet.mask}`,
+            'Firma': subnet.company_name || 'Wolna',
+            'VLAN': subnet.vlan || '-',
+            'Status': subnet.status === 'active' ? 'Aktywna' : 'Usunięta',
+            'Data utworzenia': new Date(subnet.created_date).toLocaleDateString(),
+            'Data usunięcia': subnet.deleted_date ? new Date(subnet.deleted_date).toLocaleDateString() : '-',
+            'Ostatnia aktywność': subnet.last_activity ? new Date(subnet.last_activity).toLocaleDateString() : '-',
+            'Opis': subnet.description || '-'
+        }));
+        
+        // Convert to CSV
+        const headers = Object.keys(exportData[0]);
+        const csvContent = [
+            headers.join(','),
+            ...exportData.map(row => 
+                headers.map(header => `"${row[header]}"`).join(',')
+            )
+        ].join('\n');
+        
+        // Download
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `historia_podsieci_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showMessage('Historia podsieci została wyeksportowana', 'success');
+        
+    } catch (error) {
+        console.error('Błąd podczas eksportu historii:', error);
+        showMessage('Błąd podczas eksportu historii podsieci', 'error');
+    }
+}
+
+// Экспорт szczegółовой истории подсети
+async function exportSubnetDetailedHistory() {
+    if (!currentDetailedHistory || !currentDetailedHistory.history) {
+        showMessage('Brak danych do eksportu', 'error');
+        return;
+    }
+    
+    try {
+        const subnet = currentDetailedHistory.subnet;
+        const history = currentDetailedHistory.history;
+        
+        // Prepare data for export
+        const exportData = history.map(log => {
+            let oldValues = '';
+            let newValues = '';
+            let details = '';
+            
+            try {
+                if (log.old_values) {
+                    const old = JSON.parse(log.old_values);
+                    oldValues = Object.entries(old).map(([k,v]) => `${translateFieldName(k)}: ${v}`).join('; ');
+                }
+                if (log.new_values) {
+                    const new_val = JSON.parse(log.new_values);
+                    newValues = Object.entries(new_val).map(([k,v]) => `${translateFieldName(k)}: ${v}`).join('; ');
+                }
+                details = formatActionDetails(log.action, log.old_values, log.new_values);
+            } catch (e) {
+                oldValues = log.old_values || '-';
+                newValues = log.new_values || '-';
+                details = translateAction(log.action);
+            }
+            
+            return {
+                'Data i czas': new Date(log.created_date).toLocaleString(),
+                'Użytkownik': log.username || 'System',
+                'Akcja': translateAction(log.action),
+                'Szczegóły': details,
+                'Стари значения': oldValues,
+                'Новые значения': newValues
+            };
+        });
+        
+        // Convert to CSV
+        const headers = Object.keys(exportData[0]);
+        const csvContent = [
+            `# Historia podsieci: ${subnet.network}/${subnet.mask}`,
+            `# Status: ${subnet.status === 'active' ? 'Aktywna' : 'Usunięta'}`,
+            `# Eksport z dnia: ${new Date().toLocaleString()}`,
+            '',
+            headers.join(','),
+            ...exportData.map(row => 
+                headers.map(header => `"${row[header]}"`).join(',')
+            )
+        ].join('\n');
+        
+        // Download
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `historia_podsieci_${subnet.network.replace(/\./g, '_')}_${subnet.mask}_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showMessage('Szczegółowa historia została wyeksportowana', 'success');
+        
+    } catch (error) {
+        console.error('Błąd podczas экспорта szczegółовой истории:', error);
+        showMessage('Błąd podczas экспорта szczegółowej истории', 'error');
+    }
+}
+
+// Скрытие элемента ошибки
+function hideError(elementId) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.style.display = 'none';
+    }
+}
+
+// Фильтрация подробной истории
+function filterDetailedHistory() {
+    if (!currentDetailedHistory) return;
+    
+    const actionFilter = document.getElementById('detailedHistoryActionFilter')?.value || '';
+    const dateFrom = document.getElementById('detailedHistoryDateFrom')?.value || '';
+    const dateTo = document.getElementById('detailedHistoryDateTo')?.value || '';
+    
+    let filteredHistory = currentDetailedHistory.history;
+    
+    if (actionFilter) {
+        filteredHistory = filteredHistory.filter(log => log.action === actionFilter);
+    }
+    
+    if (dateFrom) {
+        filteredHistory = filteredHistory.filter(log => 
+            new Date(log.created_date) >= new Date(dateFrom)
+        );
+    }
+    
+    if (dateTo) {
+        filteredHistory = filteredHistory.filter(log => 
+            new Date(log.created_date) <= new Date(dateTo + 'T23:59:59')
+        );
+    }
+    
+    renderDetailedHistoryTable(filteredHistory);
+}
+
+// Reset фильтров подробной истории
+function resetDetailedHistoryFilters() {
+    const actionFilter = document.getElementById('detailedHistoryActionFilter');
+    const dateFrom = document.getElementById('detailedHistoryDateFrom');
+    const dateTo = document.getElementById('detailedHistoryDateTo');
+    
+    if (actionFilter) actionFilter.value = '';
+    if (dateFrom) dateFrom.value = '';
+    if (dateTo) dateTo.value = '';
+    
+    if (currentDetailedHistory) {
+        renderDetailedHistoryTable(currentDetailedHistory.history);
+    }
+}
+
+// IP Calculator functions
+function calculateNetwork() {
+    const ipInput = document.getElementById('calcIpAddress');
+    const maskSelect = document.getElementById('calcSubnetMask');
+    const maskCustom = document.getElementById('calcSubnetMaskCustom');
+    
+    if (!ipInput) return;
+    
+    const ip = ipInput.value.trim();
+    
+    // Clear previous errors
+    hideError('calculatorError');
+    ipInput.classList.remove('error');
+    if (maskSelect) maskSelect.classList.remove('error');
+    if (maskCustom) maskCustom.classList.remove('error');
+    
+    // Validate IP
+    if (!ip) {
+        showCalculatorError('Wprowadź adres IP');
+        ipInput.classList.add('error');
+        return;
+    }
+    
+    if (!isValidIP(ip)) {
+        showCalculatorError('Nieprawidłowy format adresu IP');
+        ipInput.classList.add('error');
+        return;
+    }
+    
+    // Get mask
+    let mask;
+    if (maskCustom && maskCustom.value.trim()) {
+        // Custom mask in decimal notation (e.g., 255.255.255.0)
+        const customMask = maskCustom.value.trim();
+        mask = convertDecimalMaskToCIDR(customMask);
+        if (mask === null) {
+            showCalculatorError('Nieprawidłowy format maski sieci');
+            maskCustom.classList.add('error');
+            return;
+        }
+    } else if (maskSelect && maskSelect.value) {
+        // CIDR notation from select
+        mask = parseInt(maskSelect.value);
+    } else {
+        showCalculatorError('Wybierz maskę sieci');
+        if (maskSelect) maskSelect.classList.add('error');
+        return;
+    }
+    
+    if (mask < 0 || mask > 32) {
+        showCalculatorError('Maska musi być w zakresie 0-32');
+        return;
+    }
+    
+    try {
+        const results = calculateNetworkParameters(ip, mask);
+        displayCalculatorResults(results);
+    } catch (error) {
+        showCalculatorError('Błąd podczas obliczeń: ' + error.message);
+    }
+}
+
+function clearCalculator() {
+    // Clear inputs
+    const ipInput = document.getElementById('calcIpAddress');
+    const maskSelect = document.getElementById('calcSubnetMask');
+    const maskCustom = document.getElementById('calcSubnetMaskCustom');
+    
+    if (ipInput) {
+        ipInput.value = '';
+        ipInput.classList.remove('error');
+    }
+    if (maskSelect) {
+        maskSelect.value = '';
+        maskSelect.classList.remove('error');
+    }
+    if (maskCustom) {
+        maskCustom.value = '';
+        maskCustom.classList.remove('error');
+    }
+    
+    // Hide results and errors
+    const results = document.getElementById('calculatorResults');
+    if (results) results.style.display = 'none';
+    
+    hideError('calculatorError');
+}
+
+function showCalculatorError(message) {
+    const errorElement = document.getElementById('calculatorError');
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+    }
+}
+
+function convertDecimalMaskToCIDR(decimalMask) {
+    // Convert decimal mask (e.g., 255.255.255.0) to CIDR notation (e.g., 24)
+    if (!isValidIP(decimalMask)) return null;
+    
+    const parts = decimalMask.split('.').map(Number);
+    let binaryString = '';
+    
+    for (let part of parts) {
+        binaryString += part.toString(2).padStart(8, '0');
+    }
+    
+    // Count consecutive 1s from the left
+    let cidr = 0;
+    for (let i = 0; i < 32; i++) {
+        if (binaryString[i] === '1') {
+            cidr++;
+        } else {
+            break;
+        }
+    }
+    
+    // Validate that there are no 1s after 0s (valid subnet mask)
+    for (let i = cidr; i < 32; i++) {
+        if (binaryString[i] === '1') {
+            return null; // Invalid mask
+        }
+    }
+    
+    return cidr;
+}
+
+function calculateNetworkParameters(ip, mask) {
+    const ipParts = ip.split('.').map(Number);
+    
+    // Calculate network address
+    const maskBits = 0xFFFFFFFF << (32 - mask);
+    const ipInt = (ipParts[0] << 24) + (ipParts[1] << 16) + (ipParts[2] << 8) + ipParts[3];
+    const networkInt = ipInt & maskBits;
+    const broadcastInt = networkInt | (0xFFFFFFFF >>> mask);
+    
+    // Convert back to dotted decimal
+    const networkAddress = [
+        (networkInt >>> 24) & 0xFF,
+        (networkInt >>> 16) & 0xFF,
+        (networkInt >>> 8) & 0xFF,
+        networkInt & 0xFF
+    ].join('.');
+    
+    const broadcastAddress = [
+        (broadcastInt >>> 24) & 0xFF,
+        (broadcastInt >>> 16) & 0xFF,
+        (broadcastInt >>> 8) & 0xFF,
+        broadcastInt & 0xFF
+    ].join('.');
+    
+    // Calculate subnet mask in decimal notation
+    const subnetMask = [
+        (maskBits >>> 24) & 0xFF,
+        (maskBits >>> 16) & 0xFF,
+        (maskBits >>> 8) & 0xFF,
+        maskBits & 0xFF
+    ].join('.');
+    
+    // Calculate host addresses
+    const hostMin = networkInt === ipInt ? null : [
+        ((networkInt + 1) >>> 24) & 0xFF,
+        ((networkInt + 1) >>> 16) & 0xFF,
+        ((networkInt + 1) >>> 8) & 0xFF,
+        (networkInt + 1) & 0xFF
+    ].join('.');
+    
+    const hostMax = broadcastInt === networkInt + 1 ? null : [
+        ((broadcastInt - 1) >>> 24) & 0xFF,
+        ((broadcastInt - 1) >>> 16) & 0xFF,
+        ((broadcastInt - 1) >>> 8) & 0xFF,
+        (broadcastInt - 1) & 0xFF
+    ].join('.');
+    
+    // Calculate number of hosts
+    const totalHosts = Math.pow(2, 32 - mask);
+    const usableHosts = mask === 32 ? 1 : (mask === 31 ? 2 : totalHosts - 2);
+    
+    // Determine network class and type
+    const firstOctet = ipParts[0];
+    let networkClass = '';
+    let networkType = '';
+    
+    if (firstOctet >= 1 && firstOctet <= 126) {
+        networkClass = 'A';
+    } else if (firstOctet >= 128 && firstOctet <= 191) {
+        networkClass = 'B';
+    } else if (firstOctet >= 192 && firstOctet <= 223) {
+        networkClass = 'C';
+    } else if (firstOctet >= 224 && firstOctet <= 239) {
+        networkClass = 'D (Multicast)';
+    } else if (firstOctet >= 240 && firstOctet <= 255) {
+        networkClass = 'E (Eksperymentalna)';
+    }
+    
+    // Determine network type
+    if (firstOctet === 10 || 
+        (firstOctet === 172 && ipParts[1] >= 16 && ipParts[1] <= 31) ||
+        (firstOctet === 192 && ipParts[1] === 168)) {
+        networkType = 'Prywatna';
+    } else if (firstOctet === 127) {
+        networkType = 'Loopback';
+    } else if (firstOctet === 169 && ipParts[1] === 254) {
+        networkType = 'Link-local';
+    } else {
+        networkType = 'Publiczna';
+    }
+    
+    return {
+        network: networkAddress,
+        subnetMask: subnetMask,
+        cidr: `/${mask}`,
+        broadcast: broadcastAddress,
+        hostMin: hostMin,
+        hostMax: hostMax,
+        totalHosts: totalHosts,
+        usableHosts: usableHosts,
+        networkClass: networkClass,
+        networkType: networkType
+    };
+}
+
+function displayCalculatorResults(results) {
+    // Show results container
+    const resultsContainer = document.getElementById('calculatorResults');
+    if (resultsContainer) resultsContainer.style.display = 'block';
+    
+    // Update result fields
+    const updateField = (id, value) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value || '-';
+    };
+    
+    updateField('resultNetwork', results.network);
+    updateField('resultSubnetMask', results.subnetMask);
+    updateField('resultCidr', results.cidr);
+    updateField('resultBroadcast', results.broadcast);
+    updateField('resultHostMin', results.hostMin);
+    updateField('resultHostMax', results.hostMax);
+    updateField('resultHosts', results.totalHosts.toLocaleString());
+    updateField('resultUsableHosts', results.usableHosts.toLocaleString());
+    updateField('resultNetworkClass', results.networkClass);
+    updateField('resultNetworkType', results.networkType);
+    
+    // Additional information
+    const additionalInfo = document.getElementById('resultAdditionalInfo');
+    if (additionalInfo) {
+        let info = '';
+        
+        if (results.usableHosts === 1) {
+            info += '<p><strong>Host route:</strong> To jest pojedynczy host (/32)</p>';
+        } else if (results.usableHosts === 2) {
+            info += '<p><strong>Point-to-point:</strong> Sieć typu punkt-punkt (/31)</p>';
+        }
+        
+        if (results.networkType === 'Prywatna') {
+            info += '<p><strong>RFC 1918:</strong> Prywatny zakres adresów IP</p>';
+        }
+        
+        if (results.totalHosts >= 1024) {
+            info += `<p><strong>Duża sieć:</strong> ${Math.floor(results.totalHosts / 256)} pełnych podsieci /24</p>`;
+        }
+        
+        additionalInfo.innerHTML = info || '<p>Brak dodatkowych informacji</p>';
+    }
+}
+
+// Filtering functions for Subnets tab
+function filterSubnets() {
+    const companyFilter = document.getElementById('companyFilter')?.value || '';
+    const searchInput = document.getElementById('searchInput')?.value.toLowerCase() || '';
+    
+    const tbody = document.querySelector('#subnetTable tbody');
+    if (!tbody) return;
+    
+    const rows = tbody.querySelectorAll('tr');
+    
+    rows.forEach(row => {
+        let visible = true;
+        const cells = row.querySelectorAll('td');
+        
+        if (cells.length < 5) return; // Skip if not enough cells
+        
+        // Get data from cells
+        const network = cells[1]?.textContent || '';
+        const company = cells[4]?.textContent || '';
+        const description = cells[6]?.textContent || '';
+        
+        // Company filter
+        if (companyFilter) {
+            const subnet = subnets.find(s => 
+                s.network === network.trim() && 
+                s.company_id == companyFilter
+            );
+            if (!subnet) visible = false;
+        }
+        
+        // Search filter
+        if (searchInput && visible) {
+            const searchableText = (network + ' ' + company + ' ' + description).toLowerCase();
+            if (!searchableText.includes(searchInput)) {
+                visible = false;
+            }
+        }
+        
+        row.style.display = visible ? '' : 'none';
+    });
+}
+
+// Filtering functions for Audit Logs tab
 function filterLogs() {
     const actionFilter = document.getElementById('actionFilter')?.value || '';
     const entityFilter = document.getElementById('entityFilter')?.value || '';
@@ -1605,330 +2622,42 @@ function filterLogs() {
     const dateFromFilter = document.getElementById('dateFromFilter')?.value || '';
     const dateToFilter = document.getElementById('dateToFilter')?.value || '';
     
-    const filters = {};
+    const filters = {
+        action: actionFilter,
+        entity_type: entityFilter,
+        username: userFilter,
+        date_from: dateFromFilter,
+        date_to: dateToFilter
+    };
     
-    if (actionFilter) {
-        filters.action = actionFilter;
-    }
+    // Remove empty filters
+    Object.keys(filters).forEach(key => {
+        if (!filters[key]) delete filters[key];
+    });
     
-    if (entityFilter) {
-        filters.entity_type = entityFilter;
-    }
-    
-    if (userFilter.trim()) {
-        filters.username = userFilter.trim();
-    }
-    
-    if (dateFromFilter) {
-        filters.date_from = dateFromFilter;
-    }
-    
-    if (dateToFilter) {
-        filters.date_to = dateToFilter;
-    }
-    
-    console.log('Применяем фильтры логов:', filters);
     loadAuditLogs(1, filters);
 }
 
-// Функция очистки фильтров логов
+function refreshLogs() {
+    loadAuditLogs(currentLogsPage, logsFilters);
+}
+
 function clearLogsFilters() {
-    document.getElementById('actionFilter').value = '';
-    document.getElementById('entityFilter').value = '';
-    document.getElementById('userFilter').value = '';
-    document.getElementById('dateFromFilter').value = '';
-    document.getElementById('dateToFilter').value = '';
+    // Clear all filter inputs
+    const filterElements = [
+        'actionFilter',
+        'entityFilter', 
+        'userFilter',
+        'dateFromFilter',
+        'dateToFilter'
+    ];
+    
+    filterElements.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) element.value = '';
+    });
+    
+    // Reset filters and reload
+    logsFilters = {};
     loadAuditLogs(1, {});
-}
-
-// Eksport do Excel
-async function exportExcel() {
-    try {
-        const response = await API.exportExcel();
-        
-        if (!response.ok) {
-            throw new Error('Błąd pobierania pliku');
-        }
-        
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `export_${new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-        
-        showMessage('Plik został pobrany pomyślnie', 'success');
-    } catch (error) {
-        console.error('Błąd eksportu:', error);
-        showMessage('Błąd podczas eksportu danych', 'error');
-    }
-}
-
-// ==========================================
-// IP CALCULATOR FUNCTIONS
-// ==========================================
-
-// Validate IP address format
-function isValidIP(ip) {
-    const ipRegex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
-    const match = ip.match(ipRegex);
-    
-    if (!match) return false;
-    
-    for (let i = 1; i <= 4; i++) {
-        const octet = parseInt(match[i]);
-        if (octet < 0 || octet > 255) return false;
-    }
-    
-    return true;
-}
-
-// Convert IP address to 32-bit integer
-function ipToInt(ip) {
-    const parts = ip.split('.');
-    return (parseInt(parts[0]) << 24) + 
-           (parseInt(parts[1]) << 16) + 
-           (parseInt(parts[2]) << 8) + 
-           parseInt(parts[3]);
-}
-
-// Convert 32-bit integer to IP address
-function intToIp(int) {
-    return [
-        (int >>> 24) & 0xFF,
-        (int >>> 16) & 0xFF,
-        (int >>> 8) & 0xFF,
-        int & 0xFF
-    ].join('.');
-}
-
-// Convert subnet mask in dotted decimal format to CIDR
-function subnetMaskToCidr(mask) {
-    if (!isValidIP(mask)) return null;
-    
-    const maskInt = ipToInt(mask);
-    
-    // Check if it's a valid subnet mask (must be contiguous 1s followed by 0s)
-    const invMask = (~maskInt >>> 0);
-    if ((invMask & (invMask + 1)) !== 0) return null;
-    
-    // Count leading ones
-    let cidr = 0;
-    let temp = maskInt >>> 0;
-    while (temp & 0x80000000) {
-        cidr++;
-        temp <<= 1;
-    }
-    
-    return cidr;
-}
-
-// Get subnet mask in dotted decimal format
-function cidrToSubnetMask(cidr) {
-    const mask = 0xFFFFFFFF << (32 - cidr);
-    return intToIp(mask >>> 0);
-}
-
-// Normalize IP address to network address based on mask
-function normalizeToNetworkAddress(ip, cidr) {
-    if (!isValidIP(ip) || typeof cidr !== 'number' || isNaN(cidr) || cidr < 0 || cidr > 32) {
-        return null;
-    }
-    
-    const ipInt = ipToInt(ip);
-    const maskInt = 0xFFFFFFFF << (32 - cidr);
-    const networkInt = ipInt & maskInt;
-    
-    return intToIp(networkInt >>> 0);
-}
-
-// Get network class based on first octet
-function getNetworkClass(ip) {
-    const firstOctet = parseInt(ip.split('.')[0]);
-    
-    if (firstOctet >= 1 && firstOctet <= 126) return 'A';
-    if (firstOctet >= 128 && firstOctet <= 191) return 'B';
-    if (firstOctet >= 192 && firstOctet <= 223) return 'C';
-    if (firstOctet >= 224 && firstOctet <= 239) return 'D (Multicast)';
-    if (firstOctet >= 240 && firstOctet <= 255) return 'E (Zarezerwowana)';
-    
-    return 'Nieznana';
-}
-
-// Get network type (public/private)
-function getNetworkType(ip) {
-    const parts = ip.split('.').map(Number);
-    const firstOctet = parts[0];
-    const secondOctet = parts[1];
-    
-    // Private networks (RFC 1918)
-    if (firstOctet === 10) return 'Prywatna (10.0.0.0/8)';
-    if (firstOctet === 172 && secondOctet >= 16 && secondOctet <= 31) return 'Prywatna (172.16.0.0/12)';
-    if (firstOctet === 192 && secondOctet === 168) return 'Prywatna (192.168.0.0/16)';
-    
-    // Loopback
-    if (firstOctet === 127) return 'Loopback (127.0.0.0/8)';
-    
-    // Link-local
-    if (firstOctet === 169 && secondOctet === 254) return 'Link-local (169.254.0.0/16)';
-    
-    // Multicast
-    if (firstOctet >= 224 && firstOctet <= 239) return 'Multicast';
-    
-    return 'Publiczna';
-}
-
-// Main calculation function
-function calculateNetwork() {
-    hideError('calculatorError');
-    
-    const ipInput = document.getElementById('calcIpAddress');
-    const maskSelect = document.getElementById('calcSubnetMask');
-    const maskCustomInput = document.getElementById('calcSubnetMaskCustom');
-    const resultsDiv = document.getElementById('calculatorResults');
-    
-    const ip = ipInput.value.trim();
-    let cidr = null;
-    
-    // Check which mask input to use
-    if (maskSelect.value) {
-        cidr = parseInt(maskSelect.value);
-    } else if (maskCustomInput.value.trim()) {
-        const customMask = maskCustomInput.value.trim();
-        cidr = subnetMaskToCidr(customMask);
-        if (cidr === null) {
-            showError('calculatorError', 'Nieprawidłowy format maski (przykład: 255.255.255.0)');
-            maskCustomInput.classList.add('error');
-            resultsDiv.style.display = 'none';
-            return;
-        }
-    }
-    
-    // Clear previous error states
-    ipInput.classList.remove('error');
-    maskSelect.classList.remove('error');
-    maskCustomInput.classList.remove('error');
-    
-    // Validate inputs
-    let hasError = false;
-    
-    if (!ip) {
-        showError('calculatorError', 'Wprowadź adres IP');
-        ipInput.classList.add('error');
-        hasError = true;
-    } else if (!isValidIP(ip)) {
-        showError('calculatorError', 'Nieprawidłowy format adresu IP (przykład: 192.168.1.100)');
-        ipInput.classList.add('error');
-        hasError = true;
-    }
-    
-    if (cidr === null) {
-        showError('calculatorError', 'Wybierz maskę z listy lub wprowadź w polu tekstowym');
-        if (!maskSelect.value) maskSelect.classList.add('error');
-        if (!maskCustomInput.value.trim()) maskCustomInput.classList.add('error');
-        hasError = true;
-    }
-    
-    if (hasError) {
-        resultsDiv.style.display = 'none';
-        return;
-    }
-    
-    try {
-        // Calculate network parameters
-        const ipInt = ipToInt(ip);
-        const maskInt = 0xFFFFFFFF << (32 - cidr);
-        const networkInt = ipInt & maskInt;
-        const broadcastInt = networkInt | (0xFFFFFFFF >>> cidr);
-        
-        const networkAddress = intToIp(networkInt >>> 0);
-        // For /32 (host route), broadcast is the same as network
-        const broadcastAddress = cidr === 32 ? networkAddress : intToIp(broadcastInt >>> 0);
-        const subnetMask = cidrToSubnetMask(cidr);
-        
-        const totalHosts = Math.pow(2, 32 - cidr);
-        const usableHosts = cidr < 31 ? totalHosts - 2 : (cidr === 31 ? 2 : 1);
-        
-        const hostMin = cidr < 31 ? intToIp((networkInt + 1) >>> 0) : networkAddress;
-        const hostMax = cidr < 31 ? intToIp((broadcastInt - 1) >>> 0) : (cidr === 32 ? networkAddress : broadcastAddress);
-        
-        const networkClass = getNetworkClass(networkAddress);
-        const networkType = getNetworkType(networkAddress);
-        
-        // Display results
-        document.getElementById('resultNetwork').textContent = networkAddress;
-        document.getElementById('resultSubnetMask').textContent = subnetMask;
-        document.getElementById('resultCidr').textContent = `/${cidr}`;
-        document.getElementById('resultBroadcast').textContent = broadcastAddress;
-        document.getElementById('resultHostMin').textContent = hostMin;
-        document.getElementById('resultHostMax').textContent = hostMax;
-        document.getElementById('resultHosts').textContent = totalHosts.toLocaleString();
-        document.getElementById('resultUsableHosts').textContent = usableHosts.toLocaleString();
-        document.getElementById('resultNetworkClass').textContent = networkClass;
-        document.getElementById('resultNetworkType').textContent = networkType;
-        
-        // Additional information
-        let additionalInfo = '';
-        
-        if (cidr >= 30) {
-            if (cidr === 30) {
-                additionalInfo = 'Sieć typu punkt-punkt z 2 dostępnymi adresami hostów.';
-            } else if (cidr === 31) {
-                additionalInfo = 'Sieć типа punkt-punkt (RFC 3021) bez adresów sieci i rozgłoszeniowych.';
-            } else if (cidr === 32) {
-                additionalInfo = 'Adres hosta (host route) - pojedynczy adres IP.';
-            }
-        } else if (cidr <= 8) {
-            additionalInfo = 'Bardzo duża sieć - uwaga na wydajność i zarządzanie ruchem.';
-        } else if (totalHosts > 1000000) {
-            additionalInfo = 'Duża sieć - rozważ podział na mniejsze подсети.';
-        }
-        
-        if (networkType.includes('Prywatna')) {
-            additionalInfo += (additionalInfo ? ' ' : '') + 'Sieć prywatna - nie routowana w Internecie.';
-        }
-        
-        document.getElementById('resultAdditionalInfo').innerHTML = 
-            additionalInfo ? `<div class="info-text">${additionalInfo}</div>` : '';
-        
-        // Show results with animation
-        resultsDiv.style.display = 'block';
-        resultsDiv.classList.add('highlight');
-        setTimeout(() => resultsDiv.classList.remove('highlight'), 2000);
-        
-    } catch (error) {
-        console.error('Błąd калькуляции:', error);
-        showError('calculatorError', 'Wystąpił błąd podczas obliczeń');
-        resultsDiv.style.display = 'none';
-    }
-}
-
-// Clear calculator inputs and results
-function clearCalculator() {
-    document.getElementById('calcIpAddress').value = '';
-    document.getElementById('calcSubnetMask').value = '';
-    document.getElementById('calcSubnetMaskCustom').value = '';
-    document.getElementById('calculatorResults').style.display = 'none';
-    
-    // Clear error states
-    document.getElementById('calcIpAddress').classList.remove('error');
-    document.getElementById('calcSubnetMask').classList.remove('error');
-    document.getElementById('calcSubnetMaskCustom').classList.remove('error');
-    hideError('calculatorError');
-}
-
-// Helper function to show error
-function showError(elementId, message) {
-    const errorElement = document.getElementById(elementId);
-    errorElement.textContent = message;
-    errorElement.style.display = 'block';
-}
-
-// Helper function to hide error
-function hideError(elementId) {
-    const errorElement = document.getElementById(elementId);
-    errorElement.style.display = 'none';
 }

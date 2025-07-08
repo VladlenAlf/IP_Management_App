@@ -43,6 +43,7 @@
             <button class="tab-button" onclick="showTab('company-management')">Firmy</button>
             <button class="tab-button" onclick="showTab('import-export')">Import/Eksport</button>
             <button class="tab-button" onclick="showTab('analytics')">Analityka</button>
+            <button class="tab-button" onclick="showTab('subnet-history')">Historia podsieci</button>
             <button class="tab-button" onclick="showTab('ip-calculator')">Kalkulator IP</button>
             <button class="tab-button" onclick="showTab('audit-logs')">Logi systemu</button>
         </nav>
@@ -51,7 +52,7 @@
         <div id="subnet-management" class="tab-content active">
             <div class="toolbar">
                 <button class="btn btn-primary" onclick="showAddSubnetModal()">Dodaj podsieć</button>
-                <button class="btn btn-success" onclick="showDivideSubnetModal()">Podziel podsieć</button>
+                <button class="btn btn-success" onclick="showDivideSubnetModal()">Podziel podsieć (wybierz z listy)</button>
                 <button class="btn btn-success" onclick="showMergeSubnetsModal()">Połącz podsieci</button>
                 <button class="btn btn-danger" onclick="showAssignFreeSubnetsModal()">Przypisz wolne podsieci</button>
                 
@@ -577,6 +578,103 @@
                     <button type="button" class="btn btn-secondary" onclick="closeModal('assignFreeSubnetsModal')">Anuluj</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Subnet History Tab -->
+    <div id="subnet-history" class="tab-content">
+        <h3>Historia podsieci</h3>
+        <p>Pełna historia wszystkich podsieci w systemie - aktywnych i usuniętych.</p>
+        
+        <div class="toolbar">
+            <div class="filters">
+                <input type="text" id="historySubnetFilter" placeholder="Szukaj podsieci..." onkeyup="filterSubnetHistory()">
+                <select id="historyStatusFilter" onchange="filterSubnetHistory()">
+                    <option value="">Wszystkie statusy</option>
+                    <option value="active">Aktywne</option>
+                    <option value="deleted">Usunięte</option>
+                </select>
+                <select id="historyCompanyFilter" onchange="filterSubnetHistory()">
+                    <option value="">Wszystkie firmy</option>
+                </select>
+                <button class="btn btn-secondary" onclick="resetSubnetHistoryFilters()">Wyczyść filtry</button>
+            </div>
+            <div class="export-buttons">
+                <button class="btn btn-success" onclick="exportSubnetHistory()">Eksportuj historię</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table id="subnetHistoryTable">
+                <thead>
+                    <tr>
+                        <th>Adres sieci</th>
+                        <th>Maska</th>
+                        <th>Firma</th>
+                        <th>VLAN</th>
+                        <th>Status</th>
+                        <th>Data utworzenia</th>
+                        <th>Data usunięcia</th>
+                        <th>Ostatnia aktywność</th>
+                        <th>Akcje</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        
+        <div class="pagination" id="historyPagination"></div>
+    </div>
+
+    <!-- Modal for subnet detailed history -->
+    <div id="subnetDetailedHistoryModal" class="modal">
+        <div class="modal-content" style="max-width: 1000px;">
+            <span class="close" onclick="closeModal('subnetDetailedHistoryModal')">&times;</span>
+            <h2 id="subnetHistoryModalTitle">Historia podsieci</h2>
+            
+            <div class="subnet-info-card">
+                <h4>Informacje o podsieci</h4>
+                <div id="subnetHistoryInfo"></div>
+            </div>
+            
+            <div class="history-filters">
+                <h4>Filtry historii</h4>
+                <div class="filters">
+                    <select id="detailedHistoryActionFilter" onchange="filterDetailedHistory()">
+                        <option value="">Wszystkie akcje</option>
+                        <option value="CREATE_SUBNET">Utworzenie</option>
+                        <option value="UPDATE_SUBNET">Aktualizacja</option>
+                        <option value="DELETE_SUBNET">Usunięcie</option>
+                        <option value="DIVIDE_SUBNET">Podział</option>
+                        <option value="MERGE_SUBNETS">Połączenie</option>
+                        <option value="ASSIGN_SUBNETS">Przypisanie firmy</option>
+                    </select>
+                    <input type="date" id="detailedHistoryDateFrom" onchange="filterDetailedHistory()" placeholder="Data od">
+                    <input type="date" id="detailedHistoryDateTo" onchange="filterDetailedHistory()" placeholder="Data do">
+                    <button class="btn btn-secondary" onclick="resetDetailedHistoryFilters()">Wyczyść filtry</button>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <table id="detailedHistoryTable">
+                    <thead>
+                        <tr>
+                            <th>Data i czas</th>
+                            <th>Użytkownik</th>
+                            <th>Akcja</th>
+                            <th>Szczegóły</th>
+                            <th>Stare wartości</th>
+                            <th>Nowe wartości</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn btn-success" onclick="exportSubnetDetailedHistory()">Eksportuj historię</button>
+                <button class="btn btn-secondary" onclick="closeModal('subnetDetailedHistoryModal')">Zamknij</button>
+            </div>
         </div>
     </div>
 

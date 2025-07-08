@@ -885,3 +885,124 @@ textarea {
 .filters select {
     min-width: 150px;
 }
+
+/* Стили для истории подсетей */
+.subnet-info-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.subnet-info-card h4 {
+    margin-top: 0;
+    color: #495057;
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+.subnet-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.subnet-info-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.subnet-info-label {
+    font-weight: 600;
+    color: #6c757d;
+    font-size: 12px;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+}
+
+.subnet-info-value {
+    font-size: 14px;
+    color: #212529;
+}
+
+.history-filters {
+    background: #ffffff;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.history-filters h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #495057;
+}
+
+.history-filters .filters {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.history-filters input[type="date"] {
+    min-width: 150px;
+}
+
+.status-badge.active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-badge.deleted {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.history-details {
+    font-size: 12px;
+    max-width: 200px;
+    word-wrap: break-word;
+}
+
+.history-changes {
+    font-size: 12px;
+    max-width: 150px;
+    word-wrap: break-word;
+}
+
+.history-changes .old-value {
+    color: #dc3545;
+    text-decoration: line-through;
+}
+
+.history-changes .new-value {
+    color: #28a745;
+    font-weight: 500;
+}
+
+.modal-actions {
+    margin-top: 20px;
+    text-align: right;
+    border-top: 1px solid #dee2e6;
+    padding-top: 15px;
+}
+
+/* Улучшения для таблицы истории */
+#subnetHistoryTable th:nth-child(1),
+#detailedHistoryTable th:nth-child(1) {
+    min-width: 120px;
+}
+
+#subnetHistoryTable th:nth-child(2),
+#detailedHistoryTable th:nth-child(2) {
+    min-width: 80px;
+}
+
+#subnetHistoryTable th:nth-child(8),
+#detailedHistoryTable th:nth-child(6) {
+    min-width: 100px;
+}

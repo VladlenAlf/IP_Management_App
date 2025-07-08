@@ -379,7 +379,7 @@ app.put('/api/companies/:id', requireAuth, (req, res) => {
     db.run("UPDATE companies SET name = ?, description = ? WHERE id = ?",
       [name, description, id], function(err) {
         if (err) {
-          console.log(`Błąд UPDATE компании ${id}:`, err.message);
+          console.log(`Błąd UPDATE компании ${id}:`, err.message);
           logAudit(req, 'UPDATE_COMPANY_FAILED', 'company', id, null, { name, description, error: err.message });
           res.status(500).json({ error: err.message });
           return;
@@ -649,7 +649,7 @@ app.post('/api/subnets/:id/divide', requireAuth, (req, res) => {
       });
     }
     
-    // Zapisujemy nowe podsieci do bazy danych
+    // Записujemy nowe podsieci do bazy danych
     const stmt = db.prepare("INSERT INTO subnets (network, mask, company_id, vlan, description, parent_id) VALUES (?, ?, ?, ?, ?, ?)");
     const insertedSubnets = [];
     
@@ -662,11 +662,32 @@ app.post('/api/subnets/:id/divide', requireAuth, (req, res) => {
           
           if (index === newSubnets.length - 1) {
             stmt.finalize();
-            logAudit(req, 'DIVIDE_SUBNET', 'subnet', id, subnet, { new_mask, created_subnets: insertedSubnets.length });
-            res.json({ 
-              message: `Podsieć została podzielona na ${insertedSubnets.length} mniejszych podsieci`,
-              parent_subnet: subnet,
-              new_subnets: insertedSubnets
+            
+            // Usuwamy oryginalną podsieć po pomyślnym utworzeniu nowych
+            db.run("DELETE FROM subnets WHERE id = ?", [id], function(deleteErr) {
+              if (deleteErr) {
+                console.error('Błąd podczas usuwania oryginalnej podsieci:', deleteErr);
+                res.status(500).json({ error: 'Nie udało się usunąć oryginalnej podsieci' });
+                return;
+              }
+              
+              // Logujemy usunięcie oryginalnej podsieci
+              logAudit(req, 'DELETE_SUBNET', 'subnet', id, subnet, null);
+              
+              // Logujemy operację podziału
+              logAudit(req, 'DIVIDE_SUBNET', 'subnet', id, subnet, { 
+                new_mask, 
+                created_subnets: insertedSubnets.length,
+                original_deleted: true 
+              });
+              
+              res.json({ 
+                message: `Podsieć ${subnet.network}/${subnet.mask} została podzielona na ${insertedSubnets.length} mniejszych podsieci i usunięta`,
+                created_count: insertedSubnets.length,
+                parent_subnet: subnet,
+                new_subnets: insertedSubnets,
+                original_deleted: true
+              });
             });
           }
         });
@@ -773,7 +794,14 @@ app.post('/api/subnets/merge', requireAuth, (req, res) => {
             
             db.run("COMMIT");
             
+            // Logujemy usunięcie każdej starej podsieci
+            subnets.forEach(subnet => {
+              logAudit(req, 'DELETE_SUBNET', 'subnet', subnet.id, subnet, null);
+            });
+            
+            // Logujemy operację łączenia
             logAudit(req, 'MERGE_SUBNETS', 'subnet', newSubnetId, subnets, mergedSubnet);
+            
             res.json({
               message: `Połączono ${subnets.length} podsieci w jedną`,
               merged_subnet: { id: newSubnetId, ...mergedSubnet },
@@ -1271,6 +1299,192 @@ app.get('/api/audit-logs/:id', requireAuth, (req, res) => {
     }
     
     res.json(log);
+  });
+});
+
+// API for subnet history - combines active subnets with historical data from audit logs
+app.get('/api/subnet-history', requireAuth, (req, res) => {
+  const { page = 1, limit = 50, subnet_filter, status_filter, company_filter } = req.query;
+  const offset = (page - 1) * limit;
+  
+  // First, get all unique subnets that have ever existed (from current subnets + audit logs)
+  let subnetQuery = `
+    SELECT DISTINCT 
+      s.id, s.network, s.mask, s.company_id, s.vlan, s.description, s.created_date,
+      c.name as company_name,
+      'active' as status,
+      NULL as deleted_date,
+      (SELECT MAX(al.created_date) FROM audit_logs al WHERE al.entity_type = 'subnet' AND al.entity_id = s.id) as last_activity
+    FROM subnets s
+    LEFT JOIN companies c ON s.company_id = c.id
+    WHERE 1=1
+  `;
+  
+  let deletedSubnetQuery = `
+    SELECT DISTINCT 
+      CAST(al.entity_id AS INTEGER) as id,
+      COALESCE(JSON_EXTRACT(al.old_values, '$.network'), JSON_EXTRACT(al.new_values, '$.network')) as network,
+      COALESCE(JSON_EXTRACT(al.old_values, '$.mask'), JSON_EXTRACT(al.new_values, '$.mask')) as mask,
+      COALESCE(JSON_EXTRACT(al.old_values, '$.company_id'), JSON_EXTRACT(al.new_values, '$.company_id')) as company_id,
+      COALESCE(JSON_EXTRACT(al.old_values, '$.vlan'), JSON_EXTRACT(al.new_values, '$.vlan')) as vlan,
+      COALESCE(JSON_EXTRACT(al.old_values, '$.description'), JSON_EXTRACT(al.new_values, '$.description')) as description,
+      (SELECT MIN(al2.created_date) FROM audit_logs al2 WHERE al2.entity_type = 'subnet' AND al2.entity_id = al.entity_id AND al2.action = 'CREATE_SUBNET') as created_date,
+      c.name as company_name,
+      'deleted' as status,
+      al.created_date as deleted_date,
+      al.created_date as last_activity
+    FROM audit_logs al
+    LEFT JOIN companies c ON CAST(COALESCE(JSON_EXTRACT(al.old_values, '$.company_id'), JSON_EXTRACT(al.new_values, '$.company_id')) AS INTEGER) = c.id
+    WHERE al.action = 'DELETE_SUBNET' 
+      AND al.entity_id NOT IN (SELECT CAST(id AS TEXT) FROM subnets)
+  `;
+  
+  let params = [];
+  let countParams = [];
+  
+  // Apply filters
+  if (subnet_filter) {
+    subnetQuery += ` AND (s.network LIKE ? OR s.description LIKE ?)`;
+    deletedSubnetQuery += ` AND (COALESCE(JSON_EXTRACT(al.old_values, '$.network'), JSON_EXTRACT(al.new_values, '$.network')) LIKE ? OR COALESCE(JSON_EXTRACT(al.old_values, '$.description'), JSON_EXTRACT(al.new_values, '$.description')) LIKE ?)`;
+    params.push(`%${subnet_filter}%`, `%${subnet_filter}%`);
+    countParams.push(`%${subnet_filter}%`, `%${subnet_filter}%`);
+  }
+  
+  if (company_filter) {
+    subnetQuery += ` AND s.company_id = ?`;
+    deletedSubnetQuery += ` AND CAST(COALESCE(JSON_EXTRACT(al.old_values, '$.company_id'), JSON_EXTRACT(al.new_values, '$.company_id')) AS INTEGER) = ?`;
+    params.push(company_filter);
+    countParams.push(company_filter);
+  }
+  
+  // Combine queries based on status filter
+  let finalQuery;
+  if (status_filter === 'active') {
+    finalQuery = subnetQuery + ` ORDER BY s.created_date DESC LIMIT ? OFFSET ?`;
+  } else if (status_filter === 'deleted') {
+    finalQuery = deletedSubnetQuery + ` ORDER BY deleted_date DESC LIMIT ? OFFSET ?`;
+  } else {
+    finalQuery = `(${subnetQuery}) UNION ALL (${deletedSubnetQuery}) ORDER BY last_activity DESC LIMIT ? OFFSET ?`;
+  }
+  
+  params.push(parseInt(limit), parseInt(offset));
+  
+  // Count query for pagination
+  let countQuery;
+  if (status_filter === 'active') {
+    countQuery = `SELECT COUNT(*) as total FROM subnets s LEFT JOIN companies c ON s.company_id = c.id WHERE 1=1`;
+  } else if (status_filter === 'deleted') {
+    countQuery = `SELECT COUNT(DISTINCT al.entity_id) as total FROM audit_logs al WHERE al.action = 'DELETE_SUBNET' AND al.entity_id NOT IN (SELECT CAST(id AS TEXT) FROM subnets)`;
+  } else {
+    countQuery = `SELECT 
+      (SELECT COUNT(*) FROM subnets s LEFT JOIN companies c ON s.company_id = c.id WHERE 1=1) +
+      (SELECT COUNT(DISTINCT al.entity_id) FROM audit_logs al WHERE al.action = 'DELETE_SUBNET' AND al.entity_id NOT IN (SELECT CAST(id AS TEXT) FROM subnets))
+      as total`;
+  }
+  
+  // Apply the same filters to count query
+  if (subnet_filter && status_filter !== 'deleted') {
+    countQuery += ` AND (s.network LIKE ? OR s.description LIKE ?)`;
+  }
+  if (company_filter && status_filter !== 'deleted') {
+    countQuery += ` AND s.company_id = ?`;
+  }
+  
+  // Get total count
+  db.get(countQuery, countParams, (err, countResult) => {
+    if (err) {
+      console.error('Błąd w zapytaniu count dla subnet-history:', err.message);
+      console.error('CountQuery:', countQuery);
+      console.error('CountParams:', countParams);
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    
+    // Get the actual data
+    db.all(finalQuery, params, (err, rows) => {
+      if (err) {
+        console.error('Błąd w zapytaniu finalQuery dla subnet-history:', err.message);
+        console.error('FinalQuery:', finalQuery);
+        console.error('Params:', params);
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      
+      res.json({
+        subnets: rows,
+        total: countResult.total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(countResult.total / limit)
+      });
+    });
+  });
+});
+
+// API for detailed subnet history
+app.get('/api/subnet-history/:id', requireAuth, (req, res) => {
+  const { id } = req.params;
+  const { action_filter, date_from, date_to } = req.query;
+  
+  // First get subnet basic info (from current table or reconstruct from logs)
+  db.get("SELECT * FROM subnets WHERE id = ?", [id], (err, subnet) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    
+    // Build audit logs query
+    let logsQuery = `SELECT * FROM audit_logs WHERE entity_type = 'subnet' AND entity_id = ?`;
+    let params = [id.toString()];
+    
+    if (action_filter) {
+      logsQuery += ` AND action = ?`;
+      params.push(action_filter);
+    }
+    
+    if (date_from) {
+      logsQuery += ` AND DATE(created_date) >= ?`;
+      params.push(date_from);
+    }
+    
+    if (date_to) {
+      logsQuery += ` AND DATE(created_date) <= ?`;
+      params.push(date_to);
+    }
+    
+    logsQuery += ` ORDER BY created_date DESC`;
+    
+    db.all(logsQuery, params, (err, logs) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+      
+      // If subnet doesn't exist, try to reconstruct from logs
+      if (!subnet && logs.length > 0) {
+        const createLog = logs.find(log => log.action === 'CREATE_SUBNET');
+        if (createLog && createLog.new_values) {
+          const newValues = JSON.parse(createLog.new_values);
+          subnet = {
+            id: id,
+            network: newValues.network,
+            mask: newValues.mask,
+            company_id: newValues.company_id,
+            vlan: newValues.vlan,
+            description: newValues.description,
+            created_date: createLog.created_date,
+            status: 'deleted'
+          };
+        }
+      } else if (subnet) {
+        subnet.status = 'active';
+      }
+      
+      res.json({
+        subnet: subnet,
+        history: logs
+      });
+    });
   });
 });
 
