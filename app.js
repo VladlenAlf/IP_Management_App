@@ -701,27 +701,33 @@ function editSubnet(id) {
     const subnet = subnets.find(s => s.id === id);
     if (!subnet) return;
 
-    console.log('Editing subnet:', subnet); // Отладочная информация
+    console.log('Editing subnet:', subnet); // Информация отладочная
     
-    // Сначала обновляем опции компаний
-    updateCompanyOptions();
+    // СНАЧАЛА устанавливаем обработчик формы (это сбросит значения)
+    setupSubnetFormHandler();
     
-    // Затем заполняем форму данными
+    // ПОТОМ заполняем форму данными
     document.getElementById('subnetModalTitle').textContent = 'Edytuj podsieć';
     document.getElementById('subnetId').value = subnet.id;
     document.getElementById('subnetNetwork').value = subnet.network;
-    document.getElementById('subnetMask').value = subnet.mask;
-    document.getElementById('subnetCompany').value = subnet.company_id || '';
+    
+    // Устанавливаем маску с отладкой
+    const maskSelect = document.getElementById('subnetMask');
+    console.log('Available mask options:', Array.from(maskSelect.options).map(opt => opt.value));
+    console.log('Setting mask to:', subnet.mask);
+    maskSelect.value = subnet.mask;
+    console.log('Mask after setting:', maskSelect.value);
+    
     document.getElementById('subnetVlan').value = subnet.vlan || '';
     document.getElementById('subnetDescription').value = subnet.description || '';
     
-    console.log('Set mask to:', subnet.mask); // Отладочная информация
-    console.log('Set company to:', subnet.company_id); // Отладочная информация
+    // Обновляем опции компаний с правильным значением
+    updateCompanyOptionsWithValue('subnetCompany', subnet.company_id);
+    
+    console.log('Set company to:', subnet.company_id); // Информация отладочная
+    console.log('Company after setting:', document.getElementById('subnetCompany').value);
     
     document.getElementById('subnetModal').style.display = 'block';
-    
-    // Ustawiamy obsługę zdarzenia dla formularza
-    setupSubnetFormHandler();
 }
 
 // Редактирование компании
@@ -779,6 +785,34 @@ function updateCompanyOptions() {
             console.log(`Could not restore value ${currentValue} for ${selectId}`); // Отладочная информация
         }
     });
+}
+
+// Специальная функция для обновления опций компаний с сохранением конкретного значения
+function updateCompanyOptionsWithValue(selectId, valueToSet) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    
+    if (selectId === 'analyticsCompanyFilter') {
+        select.innerHTML = '<option value="">Wszystkie firmy</option>';
+    } else {
+        select.innerHTML = '<option value="">Wolna (nieprzypisana)</option>';
+    }
+    
+    companies.forEach(company => {
+        if (company.name !== 'Wolne') {
+            const option = document.createElement('option');
+            option.value = company.id;
+            option.textContent = company.name;
+            select.appendChild(option);
+        }
+    });
+    
+    // Устанавливаем нужное значение
+    if (valueToSet && select.querySelector(`option[value="${valueToSet}"]`)) {
+        select.value = valueToSet;
+    } else if (valueToSet === '' || !valueToSet) {
+        select.value = '';
+    }
 }
 
 // Aktualizacja opcji do podziału podsieci
