@@ -797,6 +797,23 @@ textarea {
     font-size: 12px;
 }
 
+/* Style dla подсказки поиска IP */
+.ip-search-hint {
+    background-color: #e8f4fd;
+    border: 1px solid #bee5eb;
+    border-radius: 5px;
+    padding: 10px;
+    margin-top: 5px;
+    font-size: 14px;
+    color: #0c5460;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.ip-search-hint strong {
+    color: #0c5460;
+    font-weight: 600;
+}
+
 /* Responsywność */
 @media (max-width: 768px) {
     .container {
@@ -1075,4 +1092,45 @@ textarea {
     margin-bottom: 15px;
     color: #666;
     font-size: 14px;
+}
+
+/* Network validation error styles */
+.network-validation-container {
+    margin-top: 10px;
+}
+
+.validation-error {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 5px;
+    padding: 15px;
+    margin-top: 10px;
+    font-size: 14px;
+    color: #721c24;
+    line-height: 1.5;
+}
+
+.validation-error strong {
+    color: #721c24;
+    font-weight: 600;
+}
+
+.validation-error code {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 3px;
+    padding: 2px 6px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 13px;
+}
+
+.validation-error .btn {
+    margin-right: 10px;
+    margin-top: 10px;
+}
+
+/* Error state for input fields */
+input.error, select.error {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
 }
