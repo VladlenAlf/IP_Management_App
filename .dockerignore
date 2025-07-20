@@ -8,21 +8,28 @@ Dockerfile
 .dockerignore
 docker-compose*.yml
 
-# Локальные файлы разработки
+# Local development files
 node_modules
 npm-debug.log*
 .nyc_output
 
-# Временные файлы
+# Temporary files
 *.tmp
 *.temp
+test_*.js
+test_*.xlsx
 
-# Файлы IDE
+# IDE files
 .vscode
 .idea
 
-# Локальные переменные окружения (будут переданы через docker-compose)
+# Local environment variables (will be passed via docker-compose)
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Local database and uploads (will be mounted as volumes)
+data/
+uploads/
+backups/

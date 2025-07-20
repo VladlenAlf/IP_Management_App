@@ -2052,7 +2052,7 @@ function updateHistoryCompanyFilter() {
     const select = document.getElementById('historyCompanyFilter');
     if (!select) return;
 
-    const currentValue = select.value; // Запоминаем текущее значение
+    const currentValue = select.value; // Save the current value
 
     // Clear existing options except first
     select.innerHTML = '<option value="">Wszystkie firmy</option>';

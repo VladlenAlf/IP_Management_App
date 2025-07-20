@@ -1050,7 +1050,7 @@ textarea {
     text-align: center;
 }
 
-/* Компактное отображение дат */
+/* Compact date display */
 .compact-date {
     font-size: 12px;
     color: #666;
@@ -1070,13 +1070,13 @@ textarea {
     font-size: 14px;
 }
 
-/* Фильтры истории */
+/* History filters */
 #subnet-history .filters {
     gap: 10px;
     flex-wrap: wrap;
 }
 
-/* Ограничение ширины вкладки истории подсетей */
+/* Limiting the width of the subnet history tab */
 #subnet-history {
     max-width: 1200px;
     margin: 0 auto;

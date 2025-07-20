@@ -18,7 +18,8 @@
     "docker:compose:logs": "docker compose logs -f",
     "docker:compose:build": "docker compose build --no-cache",
     "docker:compose:restart": "docker compose restart",
-    "docker:compose:ps": "docker compose ps"
+    "docker:compose:ps": "docker compose ps",
+    "docker:restart": "./docker-restart.sh"
   },
   "keywords": [
     "ip-management",

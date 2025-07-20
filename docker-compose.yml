@@ -8,9 +8,9 @@ services:
       - NODE_ENV=production
       - HOST=0.0.0.0
       - PORT=3000
-      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
-      - SESSION_SECRET=${SESSION_SECRET:-ip-management-secret-key-2024}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin1234}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin1234}
+      - SESSION_SECRET=${SESSION_SECRET:-ip-management-secret-key-2024-docker}
     volumes:
       # Mounting a database to store data
       - ./data:/app/data

@@ -12,7 +12,7 @@ yarn-error.log*
 # Docker volumes
 data/
 backups/
-
+docker-restart.sh
 # Pliki środowiska
 .env
 .env.local
