@@ -304,7 +304,7 @@ Wszystkie dane podsieci są zachowywane.
 
 ## 📄 Licencja
 
-MIT License
+Apache License
 
 ## 🤝 Wsparcie
 
