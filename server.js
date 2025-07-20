@@ -1614,56 +1614,6 @@ app.get('/api/analytics/companies', requireAuth, (req, res) => {
   });
 });
 
-// Analityka - aktywność podsieci według miesięcy
-app.get('/api/analytics/monthly', requireAuth, (req, res) => {
-  const { company_id } = req.query;
-  
-  let query = `SELECT 
-    strftime('%Y-%m', s.created_date) as month,
-    COUNT(*) as count
-    FROM subnets s
-    WHERE s.created_date >= date('now', '-12 months')`;
-  
-  let params = [];
-  
-  if (company_id) {
-    query += " AND s.company_id = ?";
-    params.push(company_id);
-  }
-  
-  query += " GROUP BY strftime('%Y-%m', s.created_date) ORDER BY month";
-  
-  db.all(query, params, (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    res.json(rows);
-  });
-});
-
-// Analityka - wykorzystanie podsieci
-app.get('/api/analytics/utilization', requireAuth, (req, res) => {
-  const query = `SELECT 
-    s.network,
-    s.mask,
-    COUNT(ip.id) as used_ips,
-    (1 << (32 - s.mask)) - 2 as total_ips,
-    ROUND((COUNT(ip.id) * 100.0) / ((1 << (32 - s.mask)) - 2), 2) as utilization
-    FROM subnets s
-    LEFT JOIN ip_addresses ip ON s.id = ip.subnet_id
-    GROUP BY s.id, s.network, s.mask
-    ORDER BY utilization DESC`;
-  
-  db.all(query, [], (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    res.json(rows);
-  });
-});
-
 // Import firm z Excel
 // Eksport firm do Excel
 // Funkcja do pobierania adresów sieciowych

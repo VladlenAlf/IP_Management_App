@@ -1,35 +1,35 @@
-# Используем официальный Node.js образ
+# We use the official Node.js image
 FROM node:18-alpine
 
-# Устанавливаем рабочую директорию
+# Set the working directory
 WORKDIR /app
 
-# Копируем package.json и package-lock.json
+# Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Устанавливаем зависимости
+# Install dependencies
 RUN npm ci --only=production && npm cache clean --force
 
-# Копируем остальные файлы приложения
+# Copy the remaining application files
 COPY . .
 
-# Создаем директории для uploads и базы данных
+# Create directories for uploads and database
 RUN mkdir -p uploads data && \
     chown -R node:node /app
 
-# Переключаемся на пользователя node для безопасности
+# Switch to the node user for security
 USER node
 
-# Устанавливаем переменную для базы данных
+# Set the database path variable
 ENV DB_PATH=/app/data/ip_management.db
 
-# Открываем порт 3000
+# Open port 3000
 EXPOSE 3000
 
-# Устанавливаем переменные окружения
+# Set environment variables
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3000
 
-# Запускаем приложение
+# Start the application
 CMD ["npm", "start"]

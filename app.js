@@ -181,18 +181,6 @@ const API = {
         return response.json();
     },
 
-    async fetchAnalyticsMonthly(filters = {}) {
-        const params = new URLSearchParams();
-        Object.keys(filters).forEach(key => {
-            if (filters[key] !== '' && filters[key] !== null && filters[key] !== undefined) {
-                params.append(key, filters[key]);
-            }
-        });
-        
-        const response = await fetch(`/api/analytics/monthly?${params}`);
-        return response.json();
-    },
-
     async updateCompany(id, companyData) {
         const response = await fetch(`/api/companies/${id}`, {
             method: 'PUT',
@@ -448,13 +436,12 @@ async function updateAnalytics() {
         console.log('Analytics filters:', filters);
         
         // Ładujemy wszystkie dane równolegle
-        const [stats, companiesData, monthlyData] = await Promise.all([
+        const [stats, companiesData] = await Promise.all([
             API.fetchAnalyticsStats(filters),
-            API.fetchAnalyticsCompanies(filters),
-            API.fetchAnalyticsMonthly(filters)
+            API.fetchAnalyticsCompanies(filters)
         ]);
         
-        console.log('Analytics data received:', { stats, companiesData, monthlyData });
+        console.log('Analytics data received:', { stats, companiesData });
         
         // Aktualizujemy karty statystyk
         updateAnalyticsStats(stats);
@@ -463,7 +450,6 @@ async function updateAnalytics() {
         updateSubnetsUsageChart(stats);
         updateCompaniesChart(companiesData);
         updateVlanChart(stats);
-        updateMonthlyChart(monthlyData);
         
         console.log('Analytics updated successfully');
         
@@ -587,50 +573,6 @@ function updateCompaniesChart(data) {
     });
 }
 
-// Wykres aktywności według miesięcy
-function updateMonthlyChart(data) {
-    const canvas = document.getElementById('monthlyChart');
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    
-    if (charts.monthly) {
-        charts.monthly.destroy();
-    }
-    
-    charts.monthly = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: data.map(item => {
-                const date = new Date(item.month + '-01');
-                return date.toLocaleDateString('pl-PL', { year: 'numeric', month: 'short' });
-            }),
-            datasets: [{
-                label: 'Przydzielone adresy IP',
-                data: data.map(item => item.count),
-                borderColor: '#3498db',
-                backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                fill: true,
-                tension: 0.3
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
-            },
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                }
-            }
-        }
-    });
-}
-
 // Wykres rozkładu VLAN
 function updateVlanChart(stats) {
     const canvas = document.getElementById('vlanChart');
@@ -677,8 +619,7 @@ function updateVlanChart(stats) {
     });
 }
 
-// Модальные окна
-// Модальные окна
+// Modals
 function showAddSubnetModal() {
     document.getElementById('subnetModalTitle').textContent = 'Dodaj podsieć';
     document.getElementById('subnetForm').reset();
@@ -702,13 +643,13 @@ function showAddCompanyModal() {
 function showDivideSubnetModal() {
     const select = document.getElementById('divideSubnetSelect');
     const newMaskField = document.getElementById('newMask');
-    
-    // Восстанавливаем возможность выбора
+
+    // Przywracamy możliwość wyboru
     select.disabled = false;
     newMaskField.min = 1;
     newMaskField.max = 30;
-    
-    // Удаляем подсказку о текущей маске
+
+    // Usuwamy podpowiedź o bieżącej masce
     const hintElement = document.querySelector('.current-mask-hint');
     if (hintElement) {
         hintElement.remove();
@@ -730,13 +671,13 @@ function showAssignFreeSubnetsModal() {
 
 function closeModal(modalId) {
     document.getElementById(modalId).style.display = 'none';
-    
-    // Очищаем ошибки валидации при закрытии модального окна подсети
+
+    // Oczyszczamy błędy walidacji przy zamykaniu modalu podsieci
     if (modalId === 'subnetModal') {
         hideNetworkValidationError();
     }
-    
-    // Если закрываем модальное окно разделения, восстанавливаем исходное состояние
+
+    // Jeśli zamykamy modal podziału, przywracamy pierwotny stan
     if (modalId === 'divideSubnetModal') {
         const select = document.getElementById('divideSubnetSelect');
         const newMaskField = document.getElementById('newMask');
@@ -750,8 +691,8 @@ function closeModal(modalId) {
             newMaskField.max = 30;
             newMaskField.value = '';
         }
-        
-        // Удаляем подсказку о текущей маске
+
+        // Usuwamy podpowiedź o bieżącej masce
         const hintElement = document.querySelector('.current-mask-hint');
         if (hintElement) {
             hintElement.remove();
@@ -764,17 +705,17 @@ function editSubnet(id) {
     const subnet = subnets.find(s => s.id === id);
     if (!subnet) return;
 
-    console.log('Editing subnet:', subnet); // Информация отладочная
-    
-    // СНАЧАЛА устанавливаем обработчик формы (это сбросит значения)
+    console.log('Editing subnet:', subnet); // Informacja oddebugowania
+
+    // NAJPIERW ustawiamy obsługę formularza (to zresetuje wartości)
     setupSubnetFormHandler();
-    
-    // ПОТОМ заполняем форму данными
+
+    // POTEM wypełniamy formularz danymi
     document.getElementById('subnetModalTitle').textContent = 'Edytuj podsieć';
     document.getElementById('subnetId').value = subnet.id;
     document.getElementById('subnetNetwork').value = subnet.network;
-    
-    // Устанавливаем маску с отладкой
+
+    // Ustawiamy maskę z oddebugowaniem
     const maskSelect = document.getElementById('subnetMask');
     console.log('Available mask options:', Array.from(maskSelect.options).map(opt => opt.value));
     console.log('Setting mask to:', subnet.mask);
@@ -784,16 +725,16 @@ function editSubnet(id) {
     document.getElementById('subnetVlan').value = subnet.vlan || '';
     document.getElementById('subnetDescription').value = subnet.description || '';
     
-    // Обновляем опции компаний с правильным значением
+    // Updating company options with the correct value
     updateCompanyOptionsWithValue('subnetCompany', subnet.company_id);
-    
-    console.log('Set company to:', subnet.company_id); // Информация отладочная
+
+    console.log('Set company to:', subnet.company_id); // Informacja oddebugowania
     console.log('Company after setting:', document.getElementById('subnetCompany').value);
     
     document.getElementById('subnetModal').style.display = 'block';
 }
 
-// Редактирование компании
+// Edycja firmy
 function editCompany(id) {
     const company = companies.find(c => c.id === id);
     if (!company) {
@@ -812,12 +753,12 @@ function editCompany(id) {
     setupCompanyFormHandler();
 }
 
-// Обновление опций компаний
+// Aktualizacja opcji firm
 function updateCompanyOptions() {
     const selects = ['subnetCompany', 'analyticsCompanyFilter'];
-    
-    console.log('Updating company options, available companies:', companies); // Отладочная информация
-    
+
+    console.log('Updating company options, available companies:', companies); // Informacja oddebugowania
+
     selects.forEach(selectId => {
         const select = document.getElementById(selectId);
         if (!select) return;
@@ -832,7 +773,7 @@ function updateCompanyOptions() {
         }
         
         companies.forEach(company => {
-            if (company.name !== 'Wolne') { // Не показываем "Wолны" как опцию
+            if (company.name !== 'Wolne') { // Nie pokazujemy "Wolne" jako opcji
                 const option = document.createElement('option');
                 option.value = company.id;
                 option.textContent = company.name;
@@ -840,17 +781,17 @@ function updateCompanyOptions() {
             }
         });
         
-        // Восстанавливаем значение только если оно существует
+        // Przywracamy wartość tylko jeśli istnieje
         if (currentValue && select.querySelector(`option[value="${currentValue}"]`)) {
             select.value = currentValue;
-            console.log(`Restored value ${currentValue} for ${selectId}`); // Отладочная информация
+            console.log(`Restored value ${currentValue} for ${selectId}`); // Informacja oddebugowania
         } else {
-            console.log(`Could not restore value ${currentValue} for ${selectId}`); // Отладочная информация
+            console.log(`Could not restore value ${currentValue} for ${selectId}`); // Informacja oddebugowania
         }
     });
 }
 
-// Специальная функция для обновления опций компаний с сохранением конкретного значения
+// Specjalna funkcja do aktualizacji opcji firm z zachowaniem konkretnej wartości
 function updateCompanyOptionsWithValue(selectId, valueToSet) {
     const select = document.getElementById(selectId);
     if (!select) return;
@@ -869,8 +810,8 @@ function updateCompanyOptionsWithValue(selectId, valueToSet) {
             select.appendChild(option);
         }
     });
-    
-    // Устанавливаем нужное значение
+
+    // Ustawiamy potrzebną wartość
     if (valueToSet && select.querySelector(`option[value="${valueToSet}"]`)) {
         select.value = valueToSet;
     } else if (valueToSet === '' || !valueToSet) {
@@ -942,21 +883,21 @@ function updateAssignCompanyOptions() {
 
 // Zarządzanie zakładkami
 function showTab(tabName) {
-    // Скрыть все табы
+    // Ukryj wszystkie zakładki
     document.querySelectorAll('.tab-content').forEach(tab => {
         tab.classList.remove('active');
     });
     
-    // Убрать активный класс с кнопок
+    // Usuń aktywny klasę z przycisków
     document.querySelectorAll('.tab-button').forEach(btn => {
         btn.classList.remove('active');
     });
     
-    // Показать выбранный таб
+    // Pokaż wybraną zakładkę
     document.getElementById(tabName).classList.add('active');
     event.target.classList.add('active');
     
-    // Загружаем данные при переключении на соответствующий таб
+    // Ładujemy dane przy przełączaniu na odpowiednią zakładkę
     if (tabName === 'audit-logs') {
         loadAuditLogs();
     } else if (tabName === 'analytics') {
@@ -972,18 +913,18 @@ function showTab(tabName) {
 function setupSubnetFormHandler() {
     const subnetForm = document.getElementById('subnetForm');
     if (subnetForm) {
-        // Удаляем старые обработчики
+        // Usuwamy stare obsługi
         const newForm = subnetForm.cloneNode(true);
         subnetForm.parentNode.replaceChild(newForm, subnetForm);
         
-        // Добавляем новый обработчик
+        // Dodajemy nową obsługę
         newForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const networkInput = document.getElementById('subnetNetwork').value.trim();
             const mask = parseInt(document.getElementById('subnetMask').value);
             
-            // Скрываем предыдущие ошибки валидации
+            // Ukrywamy poprzednie błędy walidacji
             hideNetworkValidationError();
             
             // Validate IP format first
@@ -1028,15 +969,15 @@ function setupSubnetFormHandler() {
     }
 }
 
-// Обработчик формы компании
+// Obsługa formularza firmy
 function setupCompanyFormHandler() {
     const companyForm = document.getElementById('companyForm');
     if (companyForm) {
-        // Удаляем старые обработчики
+        // Usuwamy stare obsługi
         const newForm = companyForm.cloneNode(true);
         companyForm.parentNode.replaceChild(newForm, companyForm);
         
-        // Добавляем новый обработчик
+        // Dodajemy nową obsługę
         newForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
@@ -1067,7 +1008,7 @@ function setupCompanyFormHandler() {
     }
 }
 
-// Настройка обработчиков событий
+// Ustawienie obsługi zdarzeń
 function setupEventListeners() {
     setupSubnetFormHandler();
     setupCompanyFormHandler();
@@ -1101,8 +1042,8 @@ function setupEventListeners() {
             }
         });
     }
-    
-    // Форма объединения подсетей
+
+    // Formularz łączenia podsieci
     const mergeForm = document.getElementById('mergeSubnetsForm');
     if (mergeForm) {
         mergeForm.addEventListener('submit', async function(e) {
@@ -1131,8 +1072,8 @@ function setupEventListeners() {
             }
         });
     }
-    
-    // Форма массового присвоения
+
+    // Formularz masowego przypisywania
     const assignForm = document.getElementById('assignFreeSubnetsForm');
     if (assignForm) {
         assignForm.addEventListener('submit', async function(e) {
@@ -1223,7 +1164,7 @@ function setupEventListeners() {
     const subnetMaskSelect = document.getElementById('subnetMask');
     
     if (subnetNetworkInput && subnetMaskSelect) {
-        // Очищаем ошибки валидации при изменении полей
+        // Czyścimy błędy walidacji przy zmianie pól
         const clearValidationErrors = () => {
             hideNetworkValidationError();
         };
@@ -1267,7 +1208,7 @@ function setupEventListeners() {
         subnetMaskSelect.addEventListener('change', validateAndShowNormalized);
     }
     
-    // Закрытие модальных окон по клику вне их
+    // Dismiss modal windows by clicking outside
     window.addEventListener('click', function(event) {
         if (event.target.classList.contains('modal')) {
             event.target.style.display = 'none';
@@ -1275,7 +1216,7 @@ function setupEventListeners() {
     });
 }
 
-// Импорт Excel
+// Excel import
 function handleFileSelect() {
     const fileInput = document.getElementById('excelFile');
     const file = fileInput.files[0];
@@ -1313,7 +1254,7 @@ async function importExcel() {
             showMessage(`Import zakończony z ${result.errors.length} błędami. Sprawdź консоль.`, 'warning');
         }
         
-        // Odświeżamy dane po импорте подсетей и фирм
+        // Odświeżamy dane po imporcie podsieci i firm
         loadSubnets();
         loadCompanies(); // Dodano dla aktualizacji listy firm
         fileInput.value = '';
@@ -1353,8 +1294,8 @@ async function importCompaniesExcel() {
     }
 }
 
-// Экспорт фирм в Excel
-// Показ сообщений
+// Eksport firm do Excela
+// Pokaz wiadomości
 function showMessage(text, type) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${type}`;
@@ -1367,7 +1308,7 @@ function showMessage(text, type) {
     }, 5000);
 }
 
-// Утилитарные функции
+// Użytkowe funkcje
 function calculateSubnetInfo(network, mask) {
     const hostBits = 32 - mask;
     const totalHosts = Math.pow(2, hostBits);
@@ -1400,7 +1341,7 @@ function isValidIP(ip) {
     return regex.test(ip);
 }
 
-// Функция для проверки принадлежности IP-адреса к подсети
+// Funkcja do sprawdzania przynależności adresu IP do podsieci
 function ipBelongsToSubnet(ipAddress, subnetNetwork, subnetMask) {
     if (!isValidIP(ipAddress) || !isValidIP(subnetNetwork) || !subnetMask) {
         return false;
@@ -1408,15 +1349,15 @@ function ipBelongsToSubnet(ipAddress, subnetNetwork, subnetMask) {
     
     const ipParts = ipAddress.split('.').map(Number);
     const networkParts = subnetNetwork.split('.').map(Number);
-    
-    // Преобразуем IP и сеть в целые числа
+
+    // Przekształcamy IP i sieć w liczby całkowite
     const ipInt = (ipParts[0] << 24) + (ipParts[1] << 16) + (ipParts[2] << 8) + ipParts[3];
     const networkInt = (networkParts[0] << 24) + (networkParts[1] << 16) + (networkParts[2] << 8) + networkParts[3];
-    
-    // Создаём маску подсети
+
+    // Tworzymy maskę podsieci
     const maskBits = 0xFFFFFFFF << (32 - subnetMask);
-    
-    // Применяем маску к обоим адресам и сравниваем
+
+    // Zastosuj maskę do obu adresów i porównaj
     return (ipInt & maskBits) === (networkInt & maskBits);
 }
 
@@ -1461,7 +1402,7 @@ function renderCompaniesTable() {
         // Liczymy ilość podsieci dla każdej firmy
         let subnetCount;
         if (company.name === 'Wolne') {
-            // Для фирмы "Wолне" считаем подсети с company_id = NULL или company_id = 1
+            // Dla firmy "Wolne" liczymy podsieci z company_id = NULL lub company_id = 1
             subnetCount = subnets.filter(subnet => 
                 subnet.company_id === null || subnet.company_id === 1
             ).length;
@@ -1579,8 +1520,8 @@ function renderLogsPagination(data) {
     pagination.innerHTML = '';
     
     if (data.totalPages <= 1) return;
-    
-    // Кнопка "Предыдущая"
+
+    // Przycisk "Poprzednia"
     if (data.page > 1) {
         const prevBtn = document.createElement('button');
         prevBtn.className = 'btn btn-secondary btn-small';
@@ -1588,8 +1529,8 @@ function renderLogsPagination(data) {
         prevBtn.onclick = () => loadAuditLogs(data.page - 1, logsFilters);
         pagination.appendChild(prevBtn);
     }
-    
-    // Номера страниц
+
+    // Numery stron
     const startPage = Math.max(1, data.page - 2);
     const endPage = Math.min(data.totalPages, data.page + 2);
     
@@ -1600,8 +1541,8 @@ function renderLogsPagination(data) {
         pageBtn.onclick = () => loadAuditLogs(i, logsFilters);
         pagination.appendChild(pageBtn);
     }
-    
-    // Кнопка "Следующая"
+
+    // Przycisk "Następna"
     if (data.page < data.totalPages) {
         const nextBtn = document.createElement('button');
         nextBtn.className = 'btn btn-secondary btn-small';
@@ -1609,8 +1550,8 @@ function renderLogsPagination(data) {
         nextBtn.onclick = () => loadAuditLogs(data.page + 1, logsFilters);
         pagination.appendChild(nextBtn);
     }
-    
-    // Информация о страницах
+
+    // Informacje o stronach
     const info = document.createElement('span');
     info.className = 'pagination-info';
     info.textContent = `Strona ${data.page} z ${data.totalPages} (łącznie rekordów: ${data.total})`;
@@ -1626,8 +1567,8 @@ async function showLogDetails(logId) {
             showMessage(log.error, 'error');
             return;
         }
-        
-        // Заполняем основную информацию
+
+        // Wypełniamy podstawowe informacje
         document.getElementById('logDetailDate').textContent = formatDateForPoland(log.created_date);
         document.getElementById('logDetailUser').textContent = log.username;
         
@@ -1671,7 +1612,7 @@ async function showLogDetails(logId) {
         document.getElementById('logDetailIp').textContent = log.ip_address || '-';
         document.getElementById('logDetailUserAgent').textContent = log.user_agent || '-';
         
-        // Обрабатываем старые значения
+        // Przetwarzamy stare wartości
         const oldValuesSection = document.getElementById('oldValuesSection');
         const oldValuesElement = document.getElementById('logDetailOldValues');
         if (log.old_values) {
@@ -1686,8 +1627,8 @@ async function showLogDetails(logId) {
         } else {
             oldValuesSection.style.display = 'none';
         }
-        
-        // Обрабатываем новые значения
+
+        // Przetwarzamy nowe wartości
         const newValuesSection = document.getElementById('newValuesSection');
         const newValuesElement = document.getElementById('logDetailNewValues');
         if (log.new_values) {
@@ -1702,8 +1643,8 @@ async function showLogDetails(logId) {
         } else {
             newValuesSection.style.display = 'none';
         }
-        
-        // Показываем модальное окно
+
+        // Pokazujemy modalne okno
         document.getElementById('logDetailsModal').style.display = 'block';
         
     } catch (error) {
@@ -1712,12 +1653,12 @@ async function showLogDetails(logId) {
     }
 }
 
-// Обновление фильтров подсетей
+// Aktualizacja filtrów podsieci
 function updateSubnetFilters() {
     const subnetFilter = document.getElementById('subnetFilter');
     const analyticsSubnetFilter = document.getElementById('analyticsSubnetFilter');
-    
-    // Очистка существующих опций
+
+    // Czyszczenie istniejących opcji
     if (subnetFilter) subnetFilter.innerHTML = '<option value="">Wszystkie podsieci</option>';
     if (analyticsSubnetFilter) analyticsSubnetFilter.innerHTML = '<option value="">Wszystkie podsieci</option>';
     
@@ -1752,7 +1693,7 @@ function clearSubnetFilters() {
     filterSubnets();
 }
 
-// Функция для фильтрации таблицы подсетей
+// Subnet table filtering function
 function filterSubnets() {
     const searchInput = document.getElementById('searchInput')?.value?.toLowerCase().trim() || '';
     const vlanFilter = document.getElementById('vlanFilter')?.value?.toLowerCase().trim() || '';
@@ -1764,7 +1705,7 @@ function filterSubnets() {
     let foundIpMatches = false;
     let matchingSubnets = [];
     
-    // Проверяем, является ли поисковый запрос IP-адресом
+    // Checking if the search query is an IP address
     const isIpSearch = searchInput && isValidIP(searchInput);
     
     subnets.forEach((subnet, index) => {
@@ -1773,13 +1714,13 @@ function filterSubnets() {
         
         let showRow = true;
         
-        // Фильтр по поисковому запросу
+        // Filtruj według zapytania wyszukiwania
         if (searchInput) {
             const networkMatch = subnet.network.toLowerCase().includes(searchInput);
             const descriptionMatch = (subnet.description || '').toLowerCase().includes(searchInput);
             const companyNameMatch = (subnet.company_name || 'wolna').toLowerCase().includes(searchInput);
-            
-            // Если это IP-адрес, проверяем принадлежность к подсети
+
+            // Jeśli to adres IP, sprawdzamy przynależność do podsieci
             let ipBelongs = false;
             if (isIpSearch) {
                 ipBelongs = ipBelongsToSubnet(searchInput, subnet.network, subnet.mask);
@@ -1793,28 +1734,28 @@ function filterSubnets() {
                 showRow = false;
             }
         }
-        
-        // Фильтр по VLAN
+
+        // Filtruj według VLAN
         if (vlanFilter && showRow) {
             const vlanValue = subnet.vlan ? subnet.vlan.toString() : '';
             if (!vlanValue.toLowerCase().includes(vlanFilter)) {
                 showRow = false;
             }
         }
-        
-        // Фильтр по компании
+
+        // Filtruj według firmy
         if (companyFilter && showRow) {
             const companyName = (subnet.company_name || 'wolna').toLowerCase();
             if (!companyName.includes(companyFilter)) {
                 showRow = false;
             }
         }
-        
-        // Показываем или скрываем строку
+
+        // Pokazujemy lub ukrywamy wiersz
         row.style.display = showRow ? '' : 'none';
     });
-    
-    // Показываем подсказку для IP-поиска
+
+    // Pokazujemy podpowiedź dla wyszukiwania IP
     if (isIpSearch && foundIpMatches) {
         showIpSearchHint(matchingSubnets);
     } else {
@@ -1822,10 +1763,10 @@ function filterSubnets() {
     }
 }
 
-// Функция для показа подсказки IP-поиска
+// Funkcja do wyświetlania podpowiedzi dla wyszukiwania IP
 function showIpSearchHint(matchingSubnets) {
-    hideIpSearchHint(); // Удаляем предыдущую подсказку
-    
+    hideIpSearchHint(); // Usuwamy poprzednią podpowiedź
+
     const searchInput = document.getElementById('searchInput');
     if (!searchInput) return;
     
@@ -1839,7 +1780,7 @@ function showIpSearchHint(matchingSubnets) {
     searchInput.parentNode.insertBefore(hint, searchInput.nextSibling);
 }
 
-// Функция для скрытия подсказки IP-поиска
+// Funkcja do ukrywania podpowiedzi dla wyszukiwania IP
 function hideIpSearchHint() {
     const existingHint = document.querySelector('.ip-search-hint');
     if (existingHint) {
@@ -1891,13 +1832,13 @@ function showDivideSubnetModalForId(subnetId) {
     
     // Czynimy select niedostępnym do zmiany, ponieważ podsieć jest już wybrana
     select.disabled = true;
-    
-    // Устанавливаем минимальное значение маски (больше текущей)
+
+    // Ustalamy minimalną wartość maski (większa od aktualnej)
     newMaskField.min = subnet.mask + 1;
     newMaskField.max = 30;
     newMaskField.value = '';
-    
-    // Добавляем подсказку о текущей маске
+
+    // Dodajemy podpowiedź o aktualnej masce
     let hintElement = document.querySelector('.current-mask-hint');
     if (!hintElement) {
         hintElement = document.createElement('small');
@@ -1908,12 +1849,12 @@ function showDivideSubnetModalForId(subnetId) {
         newMaskField.parentNode.appendChild(hintElement);
     }
     hintElement.textContent = `Obecna maska: /${subnet.mask}. Nowa maska musi być większa.`;
-    
-    // Показываем модальное окно
+
+    // Pokazujemy modalne okno
     modal.style.display = 'block';
 }
 
-// Функции для работы с историей подсетей
+// Funkcje do pracy z historią podsieci
 // ==========================================
 // SUBNET HISTORY FUNCTIONS
 // ==========================================
@@ -1931,16 +1872,16 @@ async function loadSubnetHistory(page = 1, filters = {}) {
         renderHistoryPagination(result);
         
         // Aktualizujemy filtr firm po załadowaniu danych
-        await loadCompanies(); // Убеждаемся что компании загружены
+        await loadCompanies(); // Verify that the companies have been loaded
         updateHistoryCompanyFilter();
         
     } catch (error) {
-        console.error('Błąd во время ładowania historii podsieci:', error);
-        showMessage('Błąd во время ładowania historii podsieci', 'error');
+        console.error('Błąd podczas ładowania historii podsieci:', error);
+        showMessage('Błąd podczas ładowania historii podsieci', 'error');
     }
 }
 
-// Renderowanie tabeli historii подсетей
+// Renderowanie tabeli historii podsieci
 function renderSubnetHistoryTable() {
     const tbody = document.querySelector('#subnetHistoryTable tbody');
     if (!tbody) return;
@@ -1959,8 +1900,8 @@ function renderSubnetHistoryTable() {
         const statusClass = subnet.status === 'active' ? 'active' : 'deleted';
         const companyName = subnet.company_name || 'Wolna';
         const vlan = subnet.vlan || '-';
-        
-        // Formatowanie дат
+
+        // Formatowanie dat
         const formatDate = (dateStr) => {
             if (!dateStr) return '-';
             const date = new Date(dateStr);
@@ -2011,7 +1952,7 @@ function renderHistoryPagination(result) {
     
     pagination.innerHTML = '';
     
-    // Если нет результатов, показываем информацию
+    // Jeśli nie ma wyników, pokazujemy informację
     if (!result || !result.subnets || result.subnets.length === 0) {
         const noResults = document.createElement('span');
         noResults.textContent = 'Brak wyników do wyświetlenia';
@@ -2020,8 +1961,8 @@ function renderHistoryPagination(result) {
         pagination.appendChild(noResults);
         return;
     }
-    
-    // Если всего одна страница, не показываем навигацию
+
+    // Jeśli всего одна страница, nie pokazujemy nawigacji
     if (!result.totalPages || result.totalPages <= 1) {
         const pageInfo = document.createElement('span');
         pageInfo.textContent = `Znaleziono ${result.total || result.subnets.length} wyników`;
@@ -2055,13 +1996,13 @@ function renderHistoryPagination(result) {
     }
 }
 
-// Обновление фильтра компаний в истории
+// Company filter update in history
 function updateHistoryCompanyFilter() {
     const select = document.getElementById('historyCompanyFilter');
     if (!select) return;
-    
-    const currentValue = select.value; // Сохраняем текущее значение
-    
+
+    const currentValue = select.value; // Запоминаем текущее значение
+
     // Clear existing options except first
     select.innerHTML = '<option value="">Wszystkie firmy</option>';
     
@@ -2072,7 +2013,7 @@ function updateHistoryCompanyFilter() {
         select.appendChild(option);
     });
     
-    // Восстанавливаем выбранное значение
+    // Recover the selected value
     if (currentValue) {
         select.value = currentValue;
     }
@@ -2086,7 +2027,7 @@ function filterSubnetHistory() {
     
     const filters = {};
     
-    // Добавляем фильтры только если они не пустые
+    // Add filters only when they are not empty
     if (subnetFilter.trim()) {
         filters.subnet_filter = subnetFilter;
     }
@@ -2100,7 +2041,7 @@ function filterSubnetHistory() {
     loadSubnetHistory(1, filters);
 }
 
-// Reset фильтров истории
+// Reset filtrów historii
 function resetSubnetHistoryFilters() {
     document.getElementById('historySubnetFilter').value = '';
     document.getElementById('historyStatusFilter').value = '';
@@ -2118,22 +2059,22 @@ async function showSubnetDetailedHistory(subnetId) {
         // Aktualizacja informacji o podsieci
         updateSubnetHistoryInfo(result.subnet);
         
-        // Рендеринг истории
+        // Rendering the history
         renderDetailedHistoryTable(result.history);
         
-        // Сброс фильтров
+        // Reset filters
         resetDetailedHistoryFilters();
         
-        // Показ модального окна
+        // Pokazujemy modalne okno
         document.getElementById('subnetDetailedHistoryModal').style.display = 'block';
         
     } catch (error) {
-        console.error('Błąд во время ładowania szczegółовой истории:', error);
+        console.error('Błąd podczas ładowania szczegółowej historii:', error);
         showMessage('Błąd podczas ładowania szczegółowej historii podsieci', 'error');
     }
 }
 
-// Актуализация информации о подсети в модальном окне
+// Aktualizacja informacji o podsieci w modalnym oknie
 function updateSubnetHistoryInfo(subnet) {
     const infoContainer = document.getElementById('subnetHistoryInfo');
     const titleElement = document.getElementById('subnetHistoryModalTitle');
@@ -2180,7 +2121,7 @@ function updateSubnetHistoryInfo(subnet) {
     `;
 }
 
-// Renderowanie таблицы szczegółовой истории
+// Renderowanie tabeli szczegółowej historii
 function renderDetailedHistoryTable(history) {
     const tbody = document.querySelector('#detailedHistoryTable tbody');
     if (!tbody) return;
@@ -2234,7 +2175,7 @@ function renderDetailedHistoryTable(history) {
 function formatHistoryValues(values) {
     if (!values) return '-';
     
-    // Если это массив объектов (например, массив подсетей)
+    // If this is an array of objects (e.g., an array of subnets)
     if (Array.isArray(values)) {
         const formatted = values.map((item, index) => {
             if (typeof item === 'object' && item !== null) {
@@ -2242,7 +2183,7 @@ function formatHistoryValues(values) {
                 if (item.network && item.mask) {
                     return `${index + 1}. ${item.network}/${item.mask}${item.company_name ? ` (${item.company_name})` : ''}`;
                 }
-                // Общая обработка объектов
+                // General object handling
                 const objFormatted = [];
                 for (const [key, value] of Object.entries(item)) {
                     if (value !== null && value !== undefined && value !== '') {
@@ -2257,14 +2198,14 @@ function formatHistoryValues(values) {
         });
         return formatted.join('<br>') || '-';
     }
-    
-    // Если это объект
+
+    // Jeśli to obiekt
     if (typeof values === 'object') {
         const formatted = [];
         for (const [key, value] of Object.entries(values)) {
             if (value !== null && value !== undefined && value !== '') {
                 const translatedKey = translateFieldName(key);
-                // Форматируем значение в зависимости от типа поля
+                // Format value according to the field type
                 const displayValue = formatFieldValue(key, value);
                 formatted.push(`${translatedKey}: ${displayValue}`);
             }
@@ -2275,15 +2216,15 @@ function formatHistoryValues(values) {
     return values.toString() || '-';
 }
 
-// Функция для форматирования значений полей
+// Field values formatting function
 function formatFieldValue(fieldName, value) {
-    // Если это ID компании, заменяем на название
+    // Replace company ID with its name, if applicable
     if (fieldName === 'company_id' || fieldName === 'ID Firmy') {
         if (value === null || value === '' || value === 'null') {
             return 'Wolna (nieprzypisana)';
         }
         
-        // Ищем компанию по ID
+        // Look up the company by ID
         const company = companies.find(c => c.id == value);
         if (company) {
             return company.name;
@@ -2291,12 +2232,12 @@ function formatFieldValue(fieldName, value) {
         return `ID: ${value} (firma nie znaleziona)`;
     }
     
-    // Если это массив, объединяем элементы
+    // If it's an array, combine the elements
     if (Array.isArray(value)) {
         return value.join(', ');
     }
-    
-    // Если это объект, преобразуем в JSON
+
+    // If it's an object, convert to JSON
     if (typeof value === 'object') {
         return JSON.stringify(value);
     }
@@ -2349,7 +2290,7 @@ function formatActionDetails(action, oldValues, newValues) {
     }
 }
 
-// Тłumaczenie названий полей
+// Tłumaczenie nazw pól
 function translateFieldName(fieldName) {
     const translations = {
         'network': 'Sieć',
@@ -2364,7 +2305,7 @@ function translateFieldName(fieldName) {
     return translations[fieldName] || fieldName;
 }
 
-// Тłumaczenie акций
+// Tłumaczenie akcji
 function translateAction(action) {
     const actionMap = {
         'LOGIN_SUCCESS': 'Logowanie do systemu',
@@ -2395,7 +2336,7 @@ function translateAction(action) {
     return actionMap[action] || action;
 }
 
-// Экспорт истории подсетей
+// Eksport historii podsieci
 async function exportSubnetHistory() {
     try {
         // Get all subnet history data without pagination
@@ -2452,7 +2393,7 @@ async function exportSubnetHistory() {
     }
 }
 
-// Экспорт szczegółовой истории подсети
+// Eksport szczegółowej historii podsieci
 async function exportSubnetDetailedHistory() {
     if (!currentDetailedHistory || !currentDetailedHistory.history) {
         showMessage('Brak danych do eksportu', 'error');
@@ -2527,7 +2468,7 @@ async function exportSubnetDetailedHistory() {
     }
 }
 
-// Скрытие элемента ошибки
+// Hide the error element
 function hideError(elementId) {
     const element = document.getElementById(elementId);
     if (element) {
@@ -2535,7 +2476,7 @@ function hideError(elementId) {
     }
 }
 
-// Фильтрация подробной истории
+// Detailed history filtering
 function filterDetailedHistory() {
     if (!currentDetailedHistory) return;
     
@@ -2564,7 +2505,7 @@ function filterDetailedHistory() {
     renderDetailedHistoryTable(filteredHistory);
 }
 
-// Reset фильтров подробной истории
+// Reset detailed history filters
 function resetDetailedHistoryFilters() {
     const actionFilter = document.getElementById('detailedHistoryActionFilter');
     const dateFrom = document.getElementById('detailedHistoryDateFrom');
@@ -2868,7 +2809,7 @@ function normalizeToNetworkAddress(ip, mask) {
     return networkParts.join('.');
 }
 
-// Функция для валидации сетевого адреса
+// Network address validation function
 function validateNetworkAddress(inputNetwork, mask) {
     if (!isValidIP(inputNetwork) || !mask || mask < 0 || mask > 32) {
         return {
@@ -2894,7 +2835,7 @@ function validateNetworkAddress(inputNetwork, mask) {
     }
 }
 
-// Функция для показа ошибки валидации с предложением
+// Function to show validation error with suggestion
 function showNetworkValidationError(validation, mask) {
     const errorHtml = `
         <div class="validation-error">
@@ -2912,32 +2853,32 @@ function showNetworkValidationError(validation, mask) {
         </div>
     `;
     
-    // Удаляем существующую ошибку
+    // Delete the existing error
     hideNetworkValidationError();
     
-    // Добавляем новую ошибку после поля сети
+    // Insert a new error message after the network field
     const networkInput = document.getElementById('subnetNetwork');
     const errorDiv = document.createElement('div');
     errorDiv.className = 'network-validation-container';
     errorDiv.innerHTML = errorHtml;
     
     networkInput.parentNode.insertBefore(errorDiv, networkInput.nextSibling);
-    
-    // Выделяем поле как некорректное
+
+    // Highlight the field as incorrect
     networkInput.classList.add('error');
 }
 
-// Функция для принятия предложенного адреса
+// Function to accept the suggested address
 function acceptSuggestedNetwork(suggestedNetwork) {
     const networkInput = document.getElementById('subnetNetwork');
     networkInput.value = suggestedNetwork;
     networkInput.classList.remove('error');
     hideNetworkValidationError();
     
-    showMessage(`Adres został zaktualizowany na prawidłowy adres сетиowy: ${suggestedNetwork}`, 'success');
+    showMessage(`Adres został zaktualizowany na prawidłowy adres sieciowy : ${suggestedNetwork}`, 'success');
 }
 
-// Функция для скрытия ошибки валидации
+// Function to hide the validation error
 function hideNetworkValidationError() {
     const existingError = document.querySelector('.network-validation-container');
     if (existingError) {

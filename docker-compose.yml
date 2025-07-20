@@ -12,15 +12,15 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
       - SESSION_SECRET=${SESSION_SECRET:-ip-management-secret-key-2024}
     volumes:
-      # Монтируем базу данных для сохранения данных
+      # Mounting a database to store data
       - ./data:/app/data
-      # Монтируем uploads для сохранения загруженных файлов
+      # Mounting uploads to store uploaded files
       - ./uploads:/app/uploads
     restart: unless-stopped
     networks:
       - ip-management-network
 
-  # Дополнительный сервис для резервного копирования (опционально)
+  # Additional service for backup (optional)
   backup:
     image: alpine:latest
     container_name: ip-management-backup
