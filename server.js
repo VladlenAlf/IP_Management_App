@@ -1170,27 +1170,45 @@ app.get('/api/export-excel', requireAuth, (req, res) => {
   
   db.all(query, (err, rows) => {
     if (err) {
+      console.error('Błąd bazy danych podczas eksportu:', err);
       res.status(500).json({ error: err.message });
       return;
     }
     
     try {
-      // Konwertujemy dane do formatu Excel
+      // Konwertujemy dane do formatu Excel z lepszymi nagłówkami
       const exportData = rows.map(row => ({
-        'network': row.network,
-        'mask': row.mask,
-        'company_id': row.company_id || '',
-        'vlan': row.vlan || '',
-        'description': row.description || '',
-        'name': row.company_name || ''
+        'Sieć': row.network,
+        'Maska': row.mask,
+        'ID Firmy': row.company_id || '',
+        'VLAN': row.vlan || '',
+        'Opis': row.description || '',
+        'Firma': row.company_name || ''
       }));
       
       const workbook = XLSX.utils.book_new();
       const worksheet = XLSX.utils.json_to_sheet(exportData);
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Dane');
       
-      const fileName = `export_${new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')}.xlsx`;
+      // Ustawiamy szerokość kolumn
+      const colWidths = [
+        { wch: 15 }, // Sieć
+        { wch: 8 },  // Maska
+        { wch: 10 }, // ID Firmy
+        { wch: 8 },  // VLAN
+        { wch: 30 }, // Opis
+        { wch: 20 }  // Firma
+      ];
+      worksheet['!cols'] = colWidths;
+      
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Podsieci');
+      
+      const fileName = `podsieci_export_${new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')}.xlsx`;
       const filePath = path.join(__dirname, 'uploads', fileName);
+      
+      // Sprawdzamy czy katalog uploads istnieje
+      if (!fs.existsSync(path.join(__dirname, 'uploads'))) {
+        fs.mkdirSync(path.join(__dirname, 'uploads'), { recursive: true });
+      }
       
       XLSX.writeFile(workbook, filePath);
       
@@ -1199,19 +1217,29 @@ app.get('/api/export-excel', requireAuth, (req, res) => {
         exported_count: rows.length 
       });
       
+      // Ustawiamy odpowiednie nagłówki
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      
       res.download(filePath, fileName, (err) => {
         if (err) {
           console.error('Błąd podczas pobierania pliku:', err);
+          if (!res.headersSent) {
+            res.status(500).json({ error: 'Błąd podczas pobierania pliku' });
+          }
         }
-        // Usuwamy plik po pobraniu
-        fs.unlink(filePath, (unlinkErr) => {
-          if (unlinkErr) console.error('Błąd podczas usuwania pliku:', unlinkErr);
-        });
+        // Usuwamy plik po pobraniu (z opóźnieniem)
+        setTimeout(() => {
+          fs.unlink(filePath, (unlinkErr) => {
+            if (unlinkErr) console.error('Błąd podczas usuwania pliku:', unlinkErr);
+          });
+        }, 5000); // 5 sekund opóźnienia
       });
       
     } catch (error) {
+      console.error('Błąd podczas tworzenia pliku Excel:', error);
       logAudit(req, 'EXPORT_EXCEL_FAILED', 'subnet', null, null, { error: error.message });
-      res.status(500).json({ error: 'Błąd podczas tworzenia pliku Excel' });
+      res.status(500).json({ error: 'Błąd podczas tworzenia pliku Excel: ' + error.message });
     }
   });
 });

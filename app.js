@@ -370,7 +370,7 @@ function filterLogs() {
     
     const filters = {};
     
-    // Добавляем фильтры только если они не пустые
+    // Apply filters only when they are not empty
     if (actionFilter) {
         filters.action = actionFilter;
     }
@@ -387,18 +387,18 @@ function filterLogs() {
         filters.date_to = dateToFilter;
     }
     
-    // Загружаем первую страницу с новыми фильтрами
+    // Loading the first page using the new filters
     loadAuditLogs(1, filters);
 }
 
-// Функция для обновления логов (без фильтров)
+// Function for refreshing logs without filters
 function refreshLogs() {
     loadAuditLogs(currentLogsPage, logsFilters);
 }
 
-// Функция для очистки всех фильтров логов
+// Function for clearing all log filters
 function clearLogsFilters() {
-    // Очищаем все поля фильтров
+    // Clear all filter fields
     const filterElements = [
         'actionFilter',
         'entityFilter', 
@@ -414,7 +414,7 @@ function clearLogsFilters() {
         }
     });
     
-    // Загружаем логи без фильтров
+    // Loading the logs without filters
     loadAuditLogs(1, {});
 }
 
@@ -638,6 +638,62 @@ function showAddCompanyModal() {
     
     // Ustawiamy obsługę zdarzenia dla formularza
     setupCompanyFormHandler();
+}
+
+// Globalna funkcja eksportu do Excel
+async function exportExcel() {
+    try {
+        showMessage('Trwa przygotowywanie pliku Excel...', 'success');
+        
+        const response = await fetch('/api/export-excel', {
+            method: 'GET',
+            credentials: 'include'
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Błąd podczas eksportu danych');
+        }
+        
+        // Sprawdzamy czy odpowiedź zawiera plik
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
+            throw new Error('Nieprawidłowy format odpowiedzi');
+        }
+        
+        // Pobieramy plik jako blob
+        const blob = await response.blob();
+        
+        // Tworzymy link do pobrania
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        
+        // Pobieramy nazwę pliku z nagłówka Content-Disposition lub generujemy domyślną
+        const contentDisposition = response.headers.get('content-disposition');
+        let fileName = 'export_podsieci.xlsx';
+        if (contentDisposition && contentDisposition.includes('filename=')) {
+            const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+            if (fileNameMatch && fileNameMatch[1]) {
+                fileName = fileNameMatch[1].replace(/['"]/g, '');
+            }
+        }
+        
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        
+        // Czyszczenie
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        showMessage('Plik Excel został pobrany pomyślnie!', 'success');
+        
+    } catch (error) {
+        console.error('Błąd eksportu Excel:', error);
+        showMessage(getLabel('EXPORT_EXCEL_FAILED') + ': ' + error.message, 'error');
+    }
 }
 
 function showDivideSubnetModal() {
@@ -1208,12 +1264,7 @@ function setupEventListeners() {
         subnetMaskSelect.addEventListener('change', validateAndShowNormalized);
     }
     
-    // Dismiss modal windows by clicking outside
-    window.addEventListener('click', function(event) {
-        if (event.target.classList.contains('modal')) {
-            event.target.style.display = 'none';
-        }
-    });
+    
 }
 
 // Excel import
@@ -2274,7 +2325,7 @@ function formatActionDetails(action, oldValues, newValues) {
             case 'DELETE_SUBNET':
                 return `Usunięto podsieć ${old.network}/${old.mask}`;
             case 'DIVIDE_SUBNET':
-                return `Podzielono na ${new_val.created_subnets || '?'} podsieci z маскą /${new_val.new_mask}`;
+                return `Podzielono na ${new_val.created_subnets || '?'} podsieci z maską /${new_val.new_mask}`;
             case 'MERGE_SUBNETS':
                 if (Array.isArray(old)) {
                     const subnetList = old.map(subnet => `${subnet.network}/${subnet.mask}`).join(', ');
